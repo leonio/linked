@@ -30,7 +30,6 @@ and read the "WinUI app" job in CI. Say in your report that it was verified by C
 | Value that changes | `{x:Bind ViewModel.Title, Mode=OneWay}` |
 | Text box / toggle the user edits | `{x:Bind ViewModel.Draft, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}` |
 | Command | `Command="{x:Bind ViewModel.LoadCommand}"` |
-| Is a command running | `{x:Bind ViewModel.LoadCommand.IsRunning, Mode=OneWay}` |
 | bool -> Visibility | `Visibility="{x:Bind ViewModel.IsBusy, Mode=OneWay}"` (a plain bool property converts by itself) |
 | inverted / computed visibility | `Visibility="{x:Bind xaml:Bind.VisibleIfNot(ViewModel.IsBusy), Mode=OneWay}"` |
 | string? -> bool | `IsOpen="{x:Bind xaml:Bind.IsNotEmpty(ViewModel.ErrorMessage), Mode=OneWay}"` |
