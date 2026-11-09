@@ -1,0 +1,16 @@
+<Solution>
+  <Configurations>
+    <Platform Name="x64" />
+    <Platform Name="ARM64" />
+  </Configurations>
+  <Folder Name="/src/">
+    <Project Path="src/Triage.Api/Triage.Api.csproj" />
+    <Project Path="src/Triage.Core/Triage.Core.csproj" />
+    <Project Path="src/Triage.App/Triage.App.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Triage.Api.Tests/Triage.Api.Tests.csproj" />
+    <Project Path="tests/Triage.Core.Tests/Triage.Core.Tests.csproj" />
+    <Project Path="tests/Triage.AotSmoke/Triage.AotSmoke.csproj" />
+  </Folder>
+</Solution>

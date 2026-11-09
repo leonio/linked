@@ -12,15 +12,15 @@ No small utility packages. If something is under ~100 lines, write it.
 
 | Package | Used for | Where |
 |---|---|---|
-| `Refit`, `Refit.HttpClientFactory` | HTTP clients generated from interfaces | Linked.Api |
-| `Microsoft.Extensions.Http` | `IHttpClientFactory` | Linked.Api |
+| `Refit`, `Refit.HttpClientFactory` | HTTP clients generated from interfaces | Triage.Api |
+| `Microsoft.Extensions.Http` | `IHttpClientFactory` | Triage.Api |
 | `Microsoft.Extensions.DependencyInjection` | DI container | Core, App |
 | `CommunityToolkit.Mvvm` | `[ObservableProperty]`, `[RelayCommand]` | Core, App |
-| `Microsoft.WindowsAppSDK` | WinUI 3 | Linked.App |
-| `Microsoft.Windows.SDK.BuildTools` | Windows SDK build tools | Linked.App |
+| `Microsoft.WindowsAppSDK` | WinUI 3 | Triage.App |
+| `Microsoft.Windows.SDK.BuildTools` | Windows SDK build tools | Triage.App |
 | `TUnit` | Tests (source-generated, runs under AOT) | tests |
 | `Refit.Testing` | `StubHttp` | tests |
-| `System.Text.Json` (in the framework) | JSON with source generation | Linked.Api |
+| `System.Text.Json` (in the framework) | JSON with source generation | Triage.Api |
 
 Pre-approved if a task needs them (add the version to `Directory.Packages.props` first):
 `CommunityToolkit.WinUI.*` packages from the Windows Community Toolkit (controls, collections, animations, helpers),
@@ -47,5 +47,5 @@ Stop and report instead of adding it, unless the task card names the package. Th
   The csproj has `<PackageReference Include="X" />` with **no version**.
 - Latest stable version at the time of adding. Check: `https://api.nuget.org/v3-flatcontainer/<lowercase-id>/index.json`.
   No preview/rc packages unless the task card says so.
-- The target framework is set once in `Directory.Build.props` (`LinkedNetVersion`). Never write `net10.0` in a csproj.
+- The target framework is set once in `Directory.Build.props` (`TriageNetVersion`). Never write `net10.0` in a csproj.
 - After any package change run the full verification in `aot-rules`: a package can compile and still break AOT.

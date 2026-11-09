@@ -5,7 +5,7 @@ These cards are shorter than the earlier ones on purpose: by now every shape has
 
 | New thing | Copy from |
 |---|---|
-| API interface + DTOs + tests | `src/Linked.Api/Notifications/`, card 3.1 |
+| API interface + DTOs + tests | `src/Triage.Api/Notifications/`, card 3.1 |
 | List view model with paging | `InboxViewModel` |
 | List page | `InboxPage` |
 | Detail page that takes a string argument | `ConversationPage` |
@@ -21,7 +21,7 @@ small wrapper record, not an array. Register the wrapper in `GitHubJsonContext`.
 Look up: `python3 tools/ghapi.py op repos/list-for-authenticated-user`.
 
 `Repos/IReposApi.ListMineAsync(string sort, int page, [AliasAs("per_page")] int perPage, ct)` -> `RepositorySummary[]`
-(the record already exists in `Notifications/NotificationThread.cs`; move it to `src/Linked.Api/Repos/RepositorySummary.cs`
+(the record already exists in `Notifications/NotificationThread.cs`; move it to `src/Triage.Api/Repos/RepositorySummary.cs`
 and fix the usings). Callers pass `sort: "pushed"`. JSON context: `RepositorySummary[]`.
 
 **Tests**: path + query; mapping. **AotSmoke**: one check.

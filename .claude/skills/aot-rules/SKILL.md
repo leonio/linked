@@ -18,7 +18,7 @@ Anything found "at run time by name" does not exist. Every rule below follows fr
 | `typeof(T).GetProperties()`, `Activator.CreateInstance`, `Type.GetType("name")`, `Assembly.GetTypes()` | Write the code out. A `switch` is fine. |
 | `dynamic`, `System.Linq.Expressions`, `Expression.Compile` | Ordinary code or a source generator |
 | `{Binding ...}` in XAML | `{x:Bind ...}` (see `winui-xaml`) |
-| `IValueConverter` | An `x:Bind` function in `Linked.App.Xaml.Bind` |
+| `IValueConverter` | An `x:Bind` function in `Triage.App.Xaml.Bind` |
 | `[DllImport]` | `[LibraryImport]` on a `static partial` method |
 | `Marshal.GetDelegateForFunctionPointer`, `ComImport` interfaces | `[GeneratedComInterface]` / function pointers |
 | `Enum.GetValues(typeof(T))`, `Enum.Parse(typeof(T), s)` | `Enum.GetValues<T>()`, `Enum.Parse<T>(s)` |
@@ -29,10 +29,10 @@ Anything found "at run time by name" does not exist. Every rule below follows fr
 
 - **`partial`** on every type a source generator or WinUI touches: view models, item models shown in lists,
   windows, pages, user controls, JSON contexts. If in doubt, make it `partial`.
-- **Register every JSON type** in `GitHubJsonContext` (`src/Linked.Api/GitHubJsonContext.cs`): each request type,
+- **Register every JSON type** in `GitHubJsonContext` (`src/Triage.Api/GitHubJsonContext.cs`): each request type,
   each reply type, and `T[]` when a method returns an array. A missing entry compiles and then throws
   `NotSupportedException` at run time.
-- **Add a `Check(...)` to `tests/Linked.AotSmoke/Program.cs`** for each new Refit interface and each new view model,
+- **Add a `Check(...)` to `tests/Triage.AotSmoke/Program.cs`** for each new Refit interface and each new view model,
   and a canned reply for each new path in `CannedHandler`. This is the only test that proves the code survives trimming.
 - Prefer `sealed` classes, `record` DTOs, `static` lambdas, and constructor injection.
 
@@ -54,10 +54,10 @@ If you cannot fix a warning with this table, stop and report it. Do not work aro
 ## Verify
 
 ```bash
-dotnet test --project tests/Linked.Api.Tests
-dotnet test --project tests/Linked.Core.Tests
-dotnet publish tests/Linked.AotSmoke -c Release -r linux-x64
-./artifacts/publish/Linked.AotSmoke/release_linux-x64/Linked.AotSmoke
+dotnet test --project tests/Triage.Api.Tests
+dotnet test --project tests/Triage.Core.Tests
+dotnet publish tests/Triage.AotSmoke -c Release -r linux-x64
+./artifacts/publish/Triage.AotSmoke/release_linux-x64/Triage.AotSmoke
 ```
 
 The publish step must print no `warning`. The binary must end with `AOT smoke: all checks passed`.

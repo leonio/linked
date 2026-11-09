@@ -1,4 +1,4 @@
-# Linked
+# Triage
 
 A native Windows client for GitHub (inbox, conversations, Actions) written in C#.
 The point of the project: see how close C# + WinUI 3 + Native AOT can get to a C++/WinRT app.
@@ -12,9 +12,9 @@ The point of the project: see how close C# + WinUI 3 + Native AOT can get to a C
 | You are touching | Skill |
 |---|---|
 | anything at all | `aot-rules` |
-| `src/Linked.Api` (endpoints, DTOs, JSON) | `api-endpoint` |
-| `src/Linked.Core` (view models, services) | `viewmodel` |
-| `src/Linked.App` (XAML, pages, controls) | `winui-xaml` |
+| `src/Triage.Api` (endpoints, DTOs, JSON) | `api-endpoint` |
+| `src/Triage.Core` (view models, services) | `viewmodel` |
+| `src/Triage.App` (XAML, pages, controls) | `winui-xaml` |
 | lists, images, start-up, anything "slow" | `performance` |
 | adding or upgrading a NuGet package | `dependencies` |
 | starting / finishing a task | `implement-task` |
@@ -22,12 +22,12 @@ The point of the project: see how close C# + WinUI 3 + Native AOT can get to a C
 ## Layout
 
 ```
-src/Linked.Api    net10.0            Refit interfaces, DTO records, JSON context. No UI. Builds anywhere.
-src/Linked.Core   net10.0 + windows  View models, services, interfaces the app implements. No XAML types.
-src/Linked.App    windows only       WinUI 3 views, Windows-only services, composition root.
-tests/Linked.Api.Tests               TUnit + Refit.Testing (StubHttp). No network, ever.
-tests/Linked.Core.Tests              TUnit + hand-written fakes (Fakes.cs).
-tests/Linked.AotSmoke                Native AOT console app that runs the real DI graph. The AOT truth test.
+src/Triage.Api    net10.0            Refit interfaces, DTO records, JSON context. No UI. Builds anywhere.
+src/Triage.Core   net10.0 + windows  View models, services, interfaces the app implements. No XAML types.
+src/Triage.App    windows only       WinUI 3 views, Windows-only services, composition root.
+tests/Triage.Api.Tests               TUnit + Refit.Testing (StubHttp). No network, ever.
+tests/Triage.Core.Tests              TUnit + hand-written fakes (Fakes.cs).
+tests/Triage.AotSmoke                Native AOT console app that runs the real DI graph. The AOT truth test.
 tools/ghapi.py                       Look up operations and schemas in GitHub's OpenAPI description.
 docs/PLAN.md, docs/tasks/            The roadmap and the task cards.
 ```
@@ -37,20 +37,20 @@ Dependencies point one way: `App -> Core -> Api`. Api types (DTOs) stop at Core:
 ## Commands
 
 ```bash
-dotnet test --project tests/Linked.Api.Tests
-dotnet test --project tests/Linked.Core.Tests
-dotnet publish tests/Linked.AotSmoke -c Release -r linux-x64 && ./artifacts/publish/Linked.AotSmoke/release_linux-x64/Linked.AotSmoke
+dotnet test --project tests/Triage.Api.Tests
+dotnet test --project tests/Triage.Core.Tests
+dotnet publish tests/Triage.AotSmoke -c Release -r linux-x64 && ./artifacts/publish/Triage.AotSmoke/release_linux-x64/Triage.AotSmoke
 ```
 
-On Windows use `-r win-x64` and `artifacts\publish\Linked.AotSmoke\release_win-x64\Linked.AotSmoke.exe`.
+On Windows use `-r win-x64` and `artifacts\publish\Triage.AotSmoke\release_win-x64\Triage.AotSmoke.exe`.
 The WinUI app only builds on Windows:
 
 ```bash
-dotnet build src/Linked.App -c Release -p:Platform=x64
-dotnet publish src/Linked.App -c Release -r win-x64 -p:Platform=x64
+dotnet build src/Triage.App -c Release -p:Platform=x64
+dotnet publish src/Triage.App -c Release -r win-x64 -p:Platform=x64
 ```
 
-If you are not on Windows you cannot build `Linked.App`. Say so in your report; CI (`.github/workflows/ci.yml`)
+If you are not on Windows you cannot build `Triage.App`. Say so in your report; CI (`.github/workflows/ci.yml`)
 builds it, publishes it with Native AOT, and launches the exe. Never claim the app works because it compiled.
 
 ## Hard rules
@@ -61,4 +61,4 @@ builds it, publishes it with Native AOT, and launches the exe. Never claim the a
 - No new NuGet package without following the `dependencies` skill.
 - No network in tests.
 - Framework and package versions live only in `Directory.Build.props` and `Directory.Packages.props`.
-- Commit messages: imperative subject, short body. **Never add a `Co-Authored-By` trailer.**
+- Commit messages: imperative subject, short body. **No trailers: never add `Co-Authored-By` or `Claude-Session` lines.**

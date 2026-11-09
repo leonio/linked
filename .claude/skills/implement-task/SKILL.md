@@ -19,34 +19,34 @@ description: How to pick up, implement, verify and hand over one task card from 
 - Copy the nearest existing example (the card names it). Same file layout, same naming, same test style.
 - Do not rename, move or reformat files the card does not mention.
 - Do not edit `Directory.Build.props`, `Directory.Packages.props`, `global.json`, `.editorconfig`, the AOT block in
-  `Linked.App.csproj`, or `.github/` unless the card says so.
+  `Triage.App.csproj`, or `.github/` unless the card says so.
 - Layer order for a feature: Api (endpoint + test) -> Core (view model + test) -> AotSmoke -> App (XAML).
   Get each layer green before starting the next.
 
 ## Verify (all of it, every time)
 
 ```bash
-dotnet test --project tests/Linked.Api.Tests
-dotnet test --project tests/Linked.Core.Tests
-dotnet publish tests/Linked.AotSmoke -c Release -r linux-x64
-./artifacts/publish/Linked.AotSmoke/release_linux-x64/Linked.AotSmoke
+dotnet test --project tests/Triage.Api.Tests
+dotnet test --project tests/Triage.Core.Tests
+dotnet publish tests/Triage.AotSmoke -c Release -r linux-x64
+./artifacts/publish/Triage.AotSmoke/release_linux-x64/Triage.AotSmoke
 ```
 
 On Windows also:
 
 ```bash
-dotnet build src/Linked.App -c Release -p:Platform=x64
+dotnet build src/Triage.App -c Release -p:Platform=x64
 ```
 
 Zero warnings, all tests pass, smoke prints `AOT smoke: all checks passed`.
-If you changed `src/Linked.App` and are not on Windows, you have not verified it: push and read the CI result,
+If you changed `src/Triage.App` and are not on Windows, you have not verified it: push and read the CI result,
 or say plainly that the XAML is unverified.
 
 ## Finish
 
 1. Tick the task in `docs/PLAN.md` (`[ ]` -> `[x]`). If part of it is not done, leave it unticked and say what is missing.
 2. Commit: imperative subject under 72 characters, e.g. `Add inbox view model`. Body: what and why in a few lines.
-   **No `Co-Authored-By` trailer.** One task = one commit where practical.
+   **No trailers: no `Co-Authored-By`, no `Claude-Session` link.** One task = one commit where practical.
 3. Report, in this order:
    - what you built (files),
    - the verification output (test counts, smoke result, whether the app was built on Windows),

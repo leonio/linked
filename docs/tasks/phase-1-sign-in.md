@@ -1,8 +1,8 @@
 # Phase 1 - Sign in
 
-Cards 1.1-1.3 and 1.6 are done: `src/Linked.Api/Auth/`, `src/Linked.Core/Services/Session.cs`,
-`src/Linked.Core/ViewModels/SignInViewModel.cs`, `src/Linked.App/Views/SignInView.xaml`,
-`src/Linked.App/Services/`.
+Cards 1.1-1.3 and 1.6 are done: `src/Triage.Api/Auth/`, `src/Triage.Core/Services/Session.cs`,
+`src/Triage.Core/ViewModels/SignInViewModel.cs`, `src/Triage.App/Views/SignInView.xaml`,
+`src/Triage.App/Services/`.
 
 How sign-in works (GitHub device flow, no client secret):
 
@@ -18,11 +18,11 @@ How sign-in works (GitHub device flow, no client secret):
 **Who**: a human with a GitHub account and a Windows 10/11 machine.
 
 1. GitHub -> Settings -> Developer settings -> OAuth Apps -> New OAuth App.
-   Name: `Linked (dev)`. Homepage URL: the repository URL. Callback URL: `http://127.0.0.1` (unused by the device flow, but required).
+   Name: `Triage (dev)`. Homepage URL: the repository URL. Callback URL: `http://127.0.0.1` (unused by the device flow, but required).
 2. On the app's page tick **Enable Device Flow** and save. Copy the **Client ID**. Do not create a client secret.
-3. Put the client id in `src/Linked.App/AppConfig.cs` (replace `REPLACE_WITH_OAUTH_APP_CLIENT_ID`), or set the
-   `LINKED_GITHUB_CLIENT_ID` environment variable. A client id is public; committing it is fine.
-4. `dotnet publish src/Linked.App -c Release -r win-x64 -p:Platform=x64`, run `artifacts\publish\Linked.App\release_win-x64\Linked.exe`.
+3. Put the client id in `src/Triage.App/AppConfig.cs` (replace `REPLACE_WITH_OAUTH_APP_CLIENT_ID`), or set the
+   `TRIAGE_GITHUB_CLIENT_ID` environment variable. A client id is public; committing it is fine.
+4. `dotnet publish src/Triage.App -c Release -r win-x64 -p:Platform=x64`, run `artifacts\publish\Triage.App\release_win-x64\Triage.exe`.
 5. Check and write the results into the pull request or an issue:
    - [ ] the window opens with Mica and a title bar
    - [ ] "Sign in with GitHub" shows a code, the browser opens, the code is on the clipboard
@@ -53,7 +53,7 @@ updates view models, which must happen on the UI thread. Getting that wrong cras
   (a `DelegatingHandler`) that calls it when a reply has status 401. Add it in `AddGitHubApi<T>` with
   `.AddHttpMessageHandler(...)`. It must not be added to the device-flow client.
 - Core: `Session` implements `IUnauthorizedHandler`; `OnUnauthorized` posts `SignOut` through `IUiDispatcher`,
-  and does nothing if already signed out. Register `IUnauthorizedHandler` -> `Session` in `AddLinkedCore`.
+  and does nothing if already signed out. Register `IUnauthorizedHandler` -> `Session` in `AddTriageCore`.
 
 **Tests**: handler calls the listener on 401 and not on 200/403/404 (Api tests, with `StubHttp`);
 `Session.OnUnauthorized` clears the token store and raises `Changed` once (Core tests).
@@ -63,5 +63,5 @@ Add a smoke `Check`: a canned 401 on one path signs the session out.
 
 ## 1.6 Friendly error messages (done)
 
-`src/Linked.Core/Services/ApiErrors.cs`: `ApiErrors.Describe(exception)` maps a failed call to a sentence.
+`src/Triage.Core/Services/ApiErrors.cs`: `ApiErrors.Describe(exception)` maps a failed call to a sentence.
 View models catch `Refit.ApiExceptionBase` and call it. See the `viewmodel` skill.

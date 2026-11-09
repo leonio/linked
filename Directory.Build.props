@@ -1,9 +1,9 @@
 <Project>
   <!-- Single source of truth for framework + language settings. Projects must not override these. -->
   <PropertyGroup>
-    <LinkedNetVersion>net10.0</LinkedNetVersion>
-    <LinkedWindowsTfm>$(LinkedNetVersion)-windows10.0.26100.0</LinkedWindowsTfm>
-    <LinkedWindowsMinVersion>10.0.19041.0</LinkedWindowsMinVersion>
+    <TriageNetVersion>net10.0</TriageNetVersion>
+    <TriageWindowsTfm>$(TriageNetVersion)-windows10.0.26100.0</TriageWindowsTfm>
+    <TriageWindowsMinVersion>10.0.19041.0</TriageWindowsMinVersion>
 
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>

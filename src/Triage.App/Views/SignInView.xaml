@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="Triage.App.Views.SignInView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:xaml="using:Triage.App.Xaml">
+  <StackPanel
+      MaxWidth="360"
+      HorizontalAlignment="Center"
+      VerticalAlignment="Center"
+      Spacing="16">
+    <TextBlock
+        HorizontalAlignment="Center"
+        Style="{StaticResource TitleTextBlockStyle}"
+        Text="Sign in to GitHub" />
+
+    <Button
+        HorizontalAlignment="Center"
+        Command="{x:Bind ViewModel.SignInCommand}"
+        Content="Sign in with GitHub"
+        Style="{StaticResource AccentButtonStyle}"
+        Visibility="{x:Bind xaml:Bind.VisibleIfNot(ViewModel.HasUserCode), Mode=OneWay}" />
+
+    <StackPanel Spacing="12" Visibility="{x:Bind ViewModel.HasUserCode, Mode=OneWay}">
+      <TextBlock
+          HorizontalAlignment="Center"
+          HorizontalTextAlignment="Center"
+          Text="Enter this code on github.com. It is already on your clipboard."
+          TextWrapping="Wrap" />
+      <TextBlock
+          HorizontalAlignment="Center"
+          CharacterSpacing="120"
+          FontFamily="Cascadia Mono, Consolas"
+          IsTextSelectionEnabled="True"
+          Style="{StaticResource TitleLargeTextBlockStyle}"
+          Text="{x:Bind ViewModel.UserCode, Mode=OneWay}" />
+      <ProgressBar IsIndeterminate="True" />
+      <StackPanel
+          HorizontalAlignment="Center"
+          Orientation="Horizontal"
+          Spacing="8">
+        <HyperlinkButton Command="{x:Bind ViewModel.OpenBrowserCommand}" Content="Open github.com again" />
+        <Button Command="{x:Bind ViewModel.SignInCancelCommand}" Content="Cancel" />
+      </StackPanel>
+    </StackPanel>
+
+    <InfoBar
+        IsClosable="False"
+        IsOpen="{x:Bind xaml:Bind.IsNotEmpty(ViewModel.ErrorMessage), Mode=OneWay}"
+        Message="{x:Bind ViewModel.ErrorMessage, Mode=OneWay}"
+        Severity="Error" />
+  </StackPanel>
+</UserControl>

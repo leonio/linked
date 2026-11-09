@@ -12,7 +12,7 @@ Rules first, measurement after. **Never claim something is faster without a numb
 
 | Metric | Budget | Where it is reported |
 |---|---|---|
-| `Linked.exe` size | CI prints it; do not grow it more than 5% in one task without saying why | CI job summary "Report binary size" |
+| `Triage.exe` size | CI prints it; do not grow it more than 5% in one task without saying why | CI job summary "Report binary size" |
 | Start-up: process start to window shown | < 400 ms on a normal laptop | manual, see Measure |
 | Working set after start, signed out | CI prints it; watch the trend | CI job summary "Launch smoke" |
 | List scrolling | no dropped frames with 1,000 items | manual |
@@ -40,7 +40,7 @@ Rules first, measurement after. **Never claim something is faster without a numb
 
 ## Images
 
-- Always decode at display size: `Bind.Image(url, size)` in `Linked.App/Xaml/Bind.cs` sets `DecodePixelWidth`.
+- Always decode at display size: `Bind.Image(url, size)` in `Triage.App/Xaml/Bind.cs` sets `DecodePixelWidth`.
   A 460 px avatar shown at 32 px otherwise costs ~200x the memory.
 - Ask GitHub for a small avatar: append `&s=64` (or `?s=64`) to `avatar_url` in the item model.
 - Never load images in a loop yourself; let `Image`/`ImageIcon`/`PersonPicture` and virtualisation do it.
@@ -55,14 +55,14 @@ Rules first, measurement after. **Never claim something is faster without a numb
 
 ## HTTP
 
-- One handler configuration (`LinkedHttp.CreateHandler`): HTTP/2, pooled connections, Brotli/gzip. Do not create `HttpClient`s by hand.
+- One handler configuration (`TriageHttp.CreateHandler`): HTTP/2, pooled connections, Brotli/gzip. Do not create `HttpClient`s by hand.
 - Always pass the `CancellationToken`; cancel the previous load when a new one starts or the page is left.
 - Do not fetch per list item (N+1). If an item needs more data, fetch it when the item is opened.
 - Respect rate limits: poll no faster than GitHub's `X-Poll-Interval` header says.
 
 ## AOT publish settings
 
-They live in `src/Linked.App/Linked.App.csproj` under the "Native AOT" comment. Do not change them as part of
+They live in `src/Triage.App/Triage.App.csproj` under the "Native AOT" comment. Do not change them as part of
 another task. A change needs before/after numbers for exe size and start-up time in the commit message.
 
 ## Measure
@@ -70,8 +70,8 @@ another task. A change needs before/after numbers for exe size and start-up time
 - **Size and working set**: push the branch; read the CI job summary of the "WinUI app" job.
 - **Start-up time** (on Windows, Release AOT publish):
   ```powershell
-  dotnet publish src/Linked.App -c Release -r win-x64 -p:Platform=x64
-  1..5 | % { $t = [Diagnostics.Stopwatch]::StartNew(); $p = Start-Process artifacts\publish\Linked.App\release_win-x64\Linked.exe -PassThru; while ($p.MainWindowHandle -eq 0) { Start-Sleep -Milliseconds 5; $p.Refresh() }; $t.ElapsedMilliseconds; Stop-Process $p }
+  dotnet publish src/Triage.App -c Release -r win-x64 -p:Platform=x64
+  1..5 | % { $t = [Diagnostics.Stopwatch]::StartNew(); $p = Start-Process artifacts\publish\Triage.App\release_win-x64\Triage.exe -PassThru; while ($p.MainWindowHandle -eq 0) { Start-Sleep -Milliseconds 5; $p.Refresh() }; $t.ElapsedMilliseconds; Stop-Process $p }
   ```
   Report the median of five runs, and ignore the first run.
 - **Never measure Debug or JIT builds.** They say nothing about the shipped app.

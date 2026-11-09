@@ -27,8 +27,8 @@ makes one request, receives 304, allocates no item models, and the poll period f
 
 `SettingsViewModel` (singleton): `[ObservableProperty] AppTheme Theme` (`System`, `Light`, `Dark`), the signed-in login,
 `SignOutCommand`, version string. Core `ISettingsStore` (`string? Get(string key)`, `void Set(string key, string value)`),
-implemented in App with a small JSON file under `Environment.SpecialFolder.LocalApplicationData/Linked/settings.json`
-using a `[JsonSerializable(typeof(Dictionary<string, string>))]` context of its own in Linked.App.
+implemented in App with a small JSON file under `Environment.SpecialFolder.LocalApplicationData/Triage/settings.json`
+using a `[JsonSerializable(typeof(Dictionary<string, string>))]` context of its own in Triage.App.
 App `SettingsPage` using a `RadioButtons` for theme; apply with `((FrameworkElement)window.Content).RequestedTheme`.
 Turn on `IsSettingsVisible` in `ShellView` and map `Route.Settings`.
 (`ApplicationData.Current` needs package identity; the app is unpackaged, so do not use it.)
@@ -57,7 +57,7 @@ it is what CI launches and what performance is measured on.
 
 ## 5.7 [S] .NET 11 and CsWinRT 3
 
-When .NET 11 and CsWinRT 3.0 are both stable and the Windows App SDK supports them: change `LinkedNetVersion` in
+When .NET 11 and CsWinRT 3.0 are both stable and the Windows App SDK supports them: change `TriageNetVersion` in
 `Directory.Build.props`, update `global.json`, update packages. Report exe size, start-up median and working set
 before and after. CsWinRT 3 was rebuilt around AOT, so this is expected to be the single largest free improvement;
 it is also a breaking change (new TFM revision, span-based projections), so read its migration notes first.
