@@ -1,4 +1,4 @@
-# Triage
+# Guit
 
 A native Windows client for GitHub (inbox, conversations, Actions) written in C#.
 The point of the project: see how close C# + WinUI 3 + Native AOT can get to a C++/WinRT app.
@@ -12,9 +12,9 @@ The point of the project: see how close C# + WinUI 3 + Native AOT can get to a C
 | You are touching | Skill |
 |---|---|
 | anything at all | `aot-rules` |
-| `src/Triage.Api` (endpoints, DTOs, JSON) | `api-endpoint` |
-| `src/Triage.Core` (view models, services) | `viewmodel` |
-| `src/Triage.App` (XAML, pages, controls) | `winui-xaml` |
+| `src/Guit.Api` (endpoints, DTOs, JSON) | `api-endpoint` |
+| `src/Guit.Core` (view models, services) | `viewmodel` |
+| `src/Guit.App` (XAML, pages, controls) | `winui-xaml` |
 | lists, images, start-up, anything "slow" | `performance` |
 | adding or upgrading a NuGet package | `dependencies` |
 | starting / finishing a task | `implement-task` |
@@ -22,12 +22,12 @@ The point of the project: see how close C# + WinUI 3 + Native AOT can get to a C
 ## Layout
 
 ```
-src/Triage.Api    net10.0            Refit interfaces, DTO records, JSON context. No UI. Builds anywhere.
-src/Triage.Core   net10.0 + windows  View models, services, interfaces the app implements. No XAML types.
-src/Triage.App    windows only       WinUI 3 views, Windows-only services, composition root.
-tests/Triage.Api.Tests               TUnit + Refit.Testing (StubHttp). No network, ever.
-tests/Triage.Core.Tests              TUnit + hand-written fakes (Fakes.cs).
-tests/Triage.AotSmoke                Native AOT console app that runs the real DI graph. The AOT truth test.
+src/Guit.Api    net10.0            Refit interfaces, DTO records, JSON context. No UI. Builds anywhere.
+src/Guit.Core   net10.0 + windows  View models, services, interfaces the app implements. No XAML types.
+src/Guit.App    windows only       WinUI 3 views, Windows-only services, composition root.
+tests/Guit.Api.Tests               TUnit + Refit.Testing (StubHttp). No network, ever.
+tests/Guit.Core.Tests              TUnit + hand-written fakes (Fakes.cs).
+tests/Guit.AotSmoke                Native AOT console app that runs the real DI graph. The AOT truth test.
 tools/ghapi.py                       Look up operations and schemas in GitHub's OpenAPI description.
 docs/PLAN.md, docs/tasks/            The roadmap and the task cards.
 ```
@@ -37,20 +37,20 @@ Dependencies point one way: `App -> Core -> Api`. Api types (DTOs) stop at Core:
 ## Commands
 
 ```bash
-dotnet test --project tests/Triage.Api.Tests
-dotnet test --project tests/Triage.Core.Tests
-dotnet publish tests/Triage.AotSmoke -c Release -r linux-x64 && ./artifacts/publish/Triage.AotSmoke/release_linux-x64/Triage.AotSmoke
+dotnet test --project tests/Guit.Api.Tests
+dotnet test --project tests/Guit.Core.Tests
+dotnet publish tests/Guit.AotSmoke -c Release -r linux-x64 && ./artifacts/publish/Guit.AotSmoke/release_linux-x64/Guit.AotSmoke
 ```
 
-On Windows use `-r win-x64` and `artifacts\publish\Triage.AotSmoke\release_win-x64\Triage.AotSmoke.exe`.
+On Windows use `-r win-x64` and `artifacts\publish\Guit.AotSmoke\release_win-x64\Guit.AotSmoke.exe`.
 The WinUI app only builds on Windows:
 
 ```bash
-dotnet build src/Triage.App -c Release -p:Platform=x64
-dotnet publish src/Triage.App -c Release -r win-x64 -p:Platform=x64
+dotnet build src/Guit.App -c Release -p:Platform=x64
+dotnet publish src/Guit.App -c Release -r win-x64 -p:Platform=x64
 ```
 
-If you are not on Windows you cannot build `Triage.App`. Say so in your report; CI (`.github/workflows/ci.yml`)
+If you are not on Windows you cannot build `Guit.App`. Say so in your report; CI (`.github/workflows/ci.yml`)
 builds it, publishes it with Native AOT, and launches the exe. Never claim the app works because it compiled.
 
 ## Hard rules

@@ -1,6 +1,6 @@
 # Plan
 
-Triage is a native Windows client for GitHub: **sign in -> inbox (the feed) -> conversations (the messaging) -> Actions (the jobs)**.
+Guit is a native Windows client for GitHub: **sign in -> inbox (the feed) -> conversations (the messaging) -> Actions (the jobs)**.
 Stack: C# on .NET 10, WinUI 3 (Windows App SDK 2.x), Native AOT, Refit 16 generated clients,
 System.Text.Json source generation, CommunityToolkit.Mvvm source generators.
 
@@ -14,10 +14,10 @@ one layer, one or two files plus tests, a worked example to copy.
 ## Phase 0 - Foundation ([cards](tasks/phase-0-foundation.md))
 
 - [x] 0.1 Solution, central build settings, warnings-as-errors, AOT analyzers on every project
-- [x] 0.2 `Triage.Api` with generated-only Refit clients and a JSON source-generation context
-- [x] 0.3 `Triage.Core` with MVVM Toolkit partial-property view models
-- [x] 0.4 `Triage.App` WinUI 3 shell: unpackaged, self-contained, `PublishAot`
-- [x] 0.5 Tests on TUnit; `Triage.AotSmoke` native smoke test
+- [x] 0.2 `Guit.Api` with generated-only Refit clients and a JSON source-generation context
+- [x] 0.3 `Guit.Core` with MVVM Toolkit partial-property view models
+- [x] 0.4 `Guit.App` WinUI 3 shell: unpackaged, self-contained, `PublishAot`
+- [x] 0.5 Tests on TUnit; `Guit.AotSmoke` native smoke test
 - [x] 0.6 CI: Linux tests + AOT smoke; Windows build + AOT publish + launch smoke test
 - [x] 0.7 `tools/ghapi.py` OpenAPI lookup; skills in `.claude/skills`
 

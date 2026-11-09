@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Guit.Core\Guit.Core.csproj" />
+    <PackageReference Include="TUnit" />
+  </ItemGroup>
+</Project>

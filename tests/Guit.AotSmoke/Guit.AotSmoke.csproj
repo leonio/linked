@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Publishes Guit.Api + Guit.Core as a native executable and runs real calls against a
+       local handler. A plain build cannot prove that code survives trimming; this can.
+       CI runs: dotnet publish -c Release -r <rid>, then executes the binary. -->
+  <PropertyGroup>
+    <PublishAot>true</PublishAot>
+    <IsAotCompatible>true</IsAotCompatible>
+    <TrimmerSingleWarn>false</TrimmerSingleWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Guit.Core\Guit.Core.csproj" />
+  </ItemGroup>
+</Project>

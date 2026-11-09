@@ -7,13 +7,13 @@ All comment text is requested as plain text until card 3.9: add
 `[Headers("Accept: application/vnd.github.full+json")]` to the methods in this phase so replies include `body_text`.
 
 ```
-Triage.Api    Issues/IIssuesApi, Issue, IssueComment, CreateCommentRequest   3.1, 3.2
+Guit.Api    Issues/IIssuesApi, Issue, IssueComment, CreateCommentRequest   3.1, 3.2
               Reactions/IReactionsApi                                        3.6
               Pulls/IPullsApi, PullRequest                                   3.7
               Search/ISearchApi                                              3.8
-Triage.Core   Models/CommentItem, ViewModels/ConversationViewModel           3.3, 3.5, 3.6, 3.7
+Guit.Core   Models/CommentItem, ViewModels/ConversationViewModel           3.3, 3.5, 3.6, 3.7
               ViewModels/PullRequestsViewModel                               3.8
-Triage.App    Views/ConversationPage.xaml, Views/PullRequestsPage.xaml       3.4, 3.5, 3.8
+Guit.App    Views/ConversationPage.xaml, Views/PullRequestsPage.xaml       3.4, 3.5, 3.8
 ```
 
 ---
@@ -21,11 +21,11 @@ Triage.App    Views/ConversationPage.xaml, Views/PullRequestsPage.xaml       3.4
 ## 3.1 Issues API: get issue, list comments
 
 **Layer** Api - **Skills** `api-endpoint`, `aot-rules` - **Depends on** nothing
-**Copy** `src/Triage.Api/Notifications/`.
+**Copy** `src/Guit.Api/Notifications/`.
 
 Look up: `python3 tools/ghapi.py op issues/get` and `python3 tools/ghapi.py op issues/list-comments`.
 
-**Build** `src/Triage.Api/Issues/`
+**Build** `src/Guit.Api/Issues/`
 - `IIssuesApi.GetAsync(string owner, string repo, int issueNumber, CancellationToken)` -> `Issue`
   on `[Get("/repos/{owner}/{repo}/issues/{issueNumber}")]`
 - `IIssuesApi.ListCommentsAsync(string owner, string repo, int issueNumber, int page, [AliasAs("per_page")] int perPage, CancellationToken)` -> `IssueComment[]`

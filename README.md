@@ -1,4 +1,4 @@
-# Triage
+# Guit
 
 A native Windows client for GitHub - inbox, conversations, Actions - written in C# with WinUI 3 and compiled with
 Native AOT. The experiment: how close can C# and Microsoft's current tooling get to a C++/WinRT app?
@@ -17,17 +17,17 @@ The roadmap is [docs/PLAN.md](docs/PLAN.md).
 ## Build
 
 ```bash
-dotnet test --project tests/Triage.Api.Tests
-dotnet test --project tests/Triage.Core.Tests
+dotnet test --project tests/Guit.Api.Tests
+dotnet test --project tests/Guit.Core.Tests
 ```
 
 On Windows:
 
 ```bash
-dotnet publish src/Triage.App -c Release -r win-x64 -p:Platform=x64
+dotnet publish src/Guit.App -c Release -r win-x64 -p:Platform=x64
 ```
 
-Then run `artifacts\publish\Triage.App\release_win-x64\Triage.exe`. Set a GitHub OAuth App client id first
+Then run `artifacts\publish\Guit.App\release_win-x64\Guit.exe`. Set a GitHub OAuth App client id first
 (card 1.4 explains how).
 
 ## Working in this repository

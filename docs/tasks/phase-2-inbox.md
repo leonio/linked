@@ -1,18 +1,18 @@
 # Phase 2 - Inbox (the feed)
 
 The inbox is the member's GitHub notifications: one row per thread (an issue, pull request, release...)
-with a title, repository, reason and time. Card 2.1 is done: `src/Triage.Api/Notifications/`.
+with a title, repository, reason and time. Card 2.1 is done: `src/Guit.Api/Notifications/`.
 
 Shape of the feature when the phase is finished:
 
 ```
-Triage.Api    INotificationsApi                     (done)
-Triage.Core   Models/NotificationItem               2.2
+Guit.Api    INotificationsApi                     (done)
+Guit.Core   Models/NotificationItem               2.2
               Text/RelativeTime                     2.2
               ViewModels/InboxViewModel             2.3, 2.6, 2.7, 2.8, 2.9
               Services/INavigator, Route            2.4
               Models/SubjectLink                    2.10
-Triage.App    Services/Navigator                    2.4
+Guit.App    Services/Navigator                    2.4
               Views/InboxPage.xaml                  2.5 and later cards
 ```
 
@@ -24,7 +24,7 @@ Triage.App    Services/Navigator                    2.4
 **Copy** the item-model template in the `viewmodel` skill.
 
 **Build**
-- `src/Triage.Core/Text/RelativeTime.cs`: `public static string Format(DateTimeOffset then, DateTimeOffset now)`.
+- `src/Guit.Core/Text/RelativeTime.cs`: `public static string Format(DateTimeOffset then, DateTimeOffset now)`.
 
   | Age | Text |
   |---|---|
@@ -36,7 +36,7 @@ Triage.App    Services/Navigator                    2.4
   | otherwise | `12 Mar 2024` |
 
   Use `CultureInfo.InvariantCulture` for the date forms (`"d MMM"`, `"d MMM yyyy"`).
-- `src/Triage.Core/Models/NotificationItem.cs`: `public sealed partial class NotificationItem : ObservableObject`.
+- `src/Guit.Core/Models/NotificationItem.cs`: `public sealed partial class NotificationItem : ObservableObject`.
   - Get-only: `string Id`, `string Title`, `string Repository` (`full_name`), `string Kind` (subject type),
     `string Reason`, `string Glyph`, `string AvatarUrl`, `string Updated`, `string? SubjectUrl`.
   - `[ObservableProperty] public partial bool IsUnread { get; set; }`
@@ -60,15 +60,15 @@ Triage.App    Services/Navigator                    2.4
 **Layer** Core - **Skills** `viewmodel`, `aot-rules` - **Depends on** 2.2
 **Copy** the page view model template in the `viewmodel` skill; tests like `SignInViewModelTests`.
 
-**Build** `src/Triage.Core/ViewModels/InboxViewModel.cs`, constructor `(INotificationsApi notifications, TimeProvider time)`.
+**Build** `src/Guit.Core/ViewModels/InboxViewModel.cs`, constructor `(INotificationsApi notifications, TimeProvider time)`.
 - `ObservableCollection<NotificationItem> Items { get; }`
 - `[ObservableProperty]` `bool IsLoading`, `string? ErrorMessage`; computed `bool IsEmpty` = not loading, no error, `Items.Count == 0`
   (raise it with `OnPropertyChanged(nameof(IsEmpty))` at the end of `LoadAsync`, and via `[NotifyPropertyChangedFor]` on the two properties).
 - `[RelayCommand] private async Task LoadAsync(CancellationToken)`: calls
   `ListAsync(all: false, participating: false, page: 1, perPage: 50, ...)`, clears `Items`, adds one item per thread
   using `time.GetUtcNow()`.
-- Register: `services.AddTransient<InboxViewModel>();` in `AddTriageCore`.
-- Add `FakeNotificationsApi` to `tests/Triage.Core.Tests/Fakes.cs`. It takes the pages to return (`NotificationThread[][]`),
+- Register: `services.AddTransient<InboxViewModel>();` in `AddGuitCore`.
+- Add `FakeNotificationsApi` to `tests/Guit.Core.Tests/Fakes.cs`. It takes the pages to return (`NotificationThread[][]`),
   records the arguments of each `ListAsync` call and the ids passed to `MarkAsReadAsync` / `MarkAsDoneAsync`,
   and can be told to fail (`Failure.Status(...)`).
 
@@ -118,7 +118,7 @@ known AOT and state-restore problem). Always `typeof(Page)`, never a type name.
 **Layer** App - **Skills** `winui-xaml`, `performance`, `aot-rules` - **Depends on** 2.3, 2.4
 **Copy** the page skeleton and list template in the `winui-xaml` skill.
 
-**Build** `src/Triage.App/Views/InboxPage.xaml` + `.xaml.cs`; map `Route.Inbox` to it in `Navigator`.
+**Build** `src/Guit.App/Views/InboxPage.xaml` + `.xaml.cs`; map `Route.Inbox` to it in `Navigator`.
 - Code-behind: `ViewModel = App.Services.GetRequiredService<InboxViewModel>()` in the constructor,
   `NavigationCacheMode = NavigationCacheMode.Required`, and `OnNavigatedTo` runs `ViewModel.LoadCommand` only when
   `Items.Count == 0`.

@@ -1,16 +1,16 @@
 ---
 name: viewmodel
-description: Rules and templates for view models, item models and services in src/Triage.Core (CommunityToolkit.Mvvm source generators, async commands, collections, fakes, tests). Load whenever a task touches Triage.Core.
+description: Rules and templates for view models, item models and services in src/Guit.Core (CommunityToolkit.Mvvm source generators, async commands, collections, fakes, tests). Load whenever a task touches Guit.Core.
 ---
 
-# View models (Triage.Core)
+# View models (Guit.Core)
 
 Worked examples to copy: `ViewModels/SignInViewModel.cs`, `ViewModels/ShellViewModel.cs`, `Services/Session.cs`,
-and their tests in `tests/Triage.Core.Tests/`.
+and their tests in `tests/Guit.Core.Tests/`.
 
-Triage.Core must not reference WinUI. No `Microsoft.UI.*`, no `Windows.*`, no `DispatcherQueue`, no `Visibility`,
+Guit.Core must not reference WinUI. No `Microsoft.UI.*`, no `Windows.*`, no `DispatcherQueue`, no `Visibility`,
 no `BitmapImage`, no colours or brushes. If a view model needs something only Windows can do (open a browser,
-clipboard, navigate, show a dialog), add a method to an interface in `Services/` and implement it in `Triage.App`.
+clipboard, navigate, show a dialog), add a method to an interface in `Services/` and implement it in `Guit.App`.
 
 ## Template: page view model
 
@@ -68,7 +68,7 @@ public sealed partial class InboxViewModel(INotificationsApi notifications) : Ob
 - No hand-written `INotifyPropertyChanged`, no `OnPropertyChanged("literal")`.
 
 **Async and threads**
-- View model code runs on the UI thread and stays there: **never write `ConfigureAwait(false)` in Triage.Core**, never `Task.Run` around an API call (HTTP is already async), never `.Result` / `.Wait()`.
+- View model code runs on the UI thread and stays there: **never write `ConfigureAwait(false)` in Guit.Core**, never `Task.Run` around an API call (HTTP is already async), never `.Result` / `.Wait()`.
 - Only touch `ObservableCollection` and `[ObservableProperty]` values from view model methods (UI thread).
 - Every command that calls the API has exactly these two catches: `catch (OperationCanceledException) { }` and
   `catch (ApiExceptionBase ex) { ErrorMessage = ApiErrors.Describe(ex); }`.
@@ -77,7 +77,7 @@ public sealed partial class InboxViewModel(INotificationsApi notifications) : Ob
   escape a command (it would crash the app); never catch bare `Exception`.
 
 **Data**
-- XAML never binds to `Triage.Api` DTOs. Map each DTO to an **item model** in `Triage.Core/Models/`:
+- XAML never binds to `Guit.Api` DTOs. Map each DTO to an **item model** in `Guit.Core/Models/`:
   ```csharp
   public sealed partial class NotificationItem(string id, string title, string repository, DateTimeOffset updatedAt) : ObservableObject
   {
@@ -99,23 +99,23 @@ public sealed partial class InboxViewModel(INotificationsApi notifications) : Ob
 
 **Construction**
 - Constructor injection with a primary constructor. Depend on interfaces (`INotificationsApi`, `ILauncher`) or Core classes (`Session`).
-- Register in `TriageCoreServiceCollectionExtensions.AddTriageCore`: page view models `AddTransient`, shell-level `AddSingleton`.
+- Register in `GuitCoreServiceCollectionExtensions.AddGuitCore`: page view models `AddTransient`, shell-level `AddSingleton`.
 - No service locator, no static state, no `IServiceProvider` parameter.
 - Time: take `TimeProvider`, never `DateTime.Now` / `Task.Delay(x)` without it.
 
 ## Tests
 
-File: `tests/Triage.Core.Tests/<Name>ViewModelTests.cs`.
+File: `tests/Guit.Core.Tests/<Name>ViewModelTests.cs`.
 
-- Fakes are hand-written classes in `tests/Triage.Core.Tests/Fakes.cs`, one per interface, reused by every test. Add the new interface's fake there. No mocking library.
+- Fakes are hand-written classes in `tests/Guit.Core.Tests/Fakes.cs`, one per interface, reused by every test. Add the new interface's fake there. No mocking library.
 - Run commands with `await viewModel.LoadCommand.ExecuteAsync(null);`.
 - A fake simulates a failed call with `Task.FromException<T>(Failure.Status(HttpStatusCode.NotFound))` (`Failure` is in `Fakes.cs`).
 - Minimum tests per view model: success path fills the state; API failure sets `ErrorMessage` and leaves `IsLoading` false; each command that changes state.
-- Then add a `Check(...)` for the view model to `tests/Triage.AotSmoke/Program.cs`.
+- Then add a `Check(...)` for the view model to `tests/Guit.AotSmoke/Program.cs`.
 
 ## Done when
 
-- [ ] No `Microsoft.UI` / `Windows.` usings in Triage.Core
+- [ ] No `Microsoft.UI` / `Windows.` usings in Guit.Core
 - [ ] Every class is `partial`; every observable value is a partial property
-- [ ] Registered in `AddTriageCore`
+- [ ] Registered in `AddGuitCore`
 - [ ] Tests pass; AOT smoke passes (see `aot-rules`)

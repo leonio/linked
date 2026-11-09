@@ -21,14 +21,14 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
-      - name: Test Triage.Api
-        run: dotnet test --project tests/Triage.Api.Tests -c Release
-      - name: Test Triage.Core
-        run: dotnet test --project tests/Triage.Core.Tests -c Release
+      - name: Test Guit.Api
+        run: dotnet test --project tests/Guit.Api.Tests -c Release
+      - name: Test Guit.Core
+        run: dotnet test --project tests/Guit.Core.Tests -c Release
       - name: Publish AOT smoke
-        run: dotnet publish tests/Triage.AotSmoke -c Release -r linux-x64
+        run: dotnet publish tests/Guit.AotSmoke -c Release -r linux-x64
       - name: Run AOT smoke
-        run: ./artifacts/publish/Triage.AotSmoke/release_linux-x64/Triage.AotSmoke
+        run: ./artifacts/publish/Guit.AotSmoke/release_linux-x64/Guit.AotSmoke
 
   app:
     name: WinUI app (build, Native AOT publish)
@@ -39,30 +39,30 @@ jobs:
         with:
           global-json-file: global.json
       - name: Build
-        run: dotnet build src/Triage.App -c Release -p:Platform=x64
+        run: dotnet build src/Guit.App -c Release -p:Platform=x64
       - name: Publish Native AOT
-        run: dotnet publish src/Triage.App -c Release -r win-x64 -p:Platform=x64
+        run: dotnet publish src/Guit.App -c Release -r win-x64 -p:Platform=x64
       - name: Report binary size
         shell: pwsh
         run: |
-          $dir = Get-ChildItem artifacts/publish/Triage.App -Directory | Select-Object -First 1
-          $exe = Get-Item (Join-Path $dir.FullName 'Triage.exe')
+          $dir = Get-ChildItem artifacts/publish/Guit.App -Directory | Select-Object -First 1
+          $exe = Get-Item (Join-Path $dir.FullName 'Guit.exe')
           $total = (Get-ChildItem $dir.FullName -Recurse -File | Measure-Object Length -Sum).Sum
-          "Triage.exe: {0:N1} MB; publish folder: {1:N1} MB" -f ($exe.Length / 1MB), ($total / 1MB) | Tee-Object -FilePath $env:GITHUB_STEP_SUMMARY -Append
+          "Guit.exe: {0:N1} MB; publish folder: {1:N1} MB" -f ($exe.Length / 1MB), ($total / 1MB) | Tee-Object -FilePath $env:GITHUB_STEP_SUMMARY -Append
       - name: Launch smoke test (the native exe must start and show a window)
         shell: pwsh
         run: |
-          $dir = Get-ChildItem artifacts/publish/Triage.App -Directory | Select-Object -First 1
-          $app = Start-Process -FilePath (Join-Path $dir.FullName 'Triage.exe') -PassThru
+          $dir = Get-ChildItem artifacts/publish/Guit.App -Directory | Select-Object -First 1
+          $app = Start-Process -FilePath (Join-Path $dir.FullName 'Guit.exe') -PassThru
           Start-Sleep -Seconds 12
           $app.Refresh()
-          if ($app.HasExited) { throw "Triage.exe exited during start-up with code $($app.ExitCode)" }
+          if ($app.HasExited) { throw "Guit.exe exited during start-up with code $($app.ExitCode)" }
           $hasWindow = $app.MainWindowHandle -ne 0
           "Launch smoke: running after 12 s, window created: $hasWindow, working set: {0:N0} MB" -f ($app.WorkingSet64 / 1MB) | Tee-Object -FilePath $env:GITHUB_STEP_SUMMARY -Append
           Stop-Process -Id $app.Id -Force
-          if (-not $hasWindow) { throw "Triage.exe started but never created a window" }
+          if (-not $hasWindow) { throw "Guit.exe started but never created a window" }
       - uses: actions/upload-artifact@v4
         with:
-          name: Triage-win-x64
-          path: artifacts/publish/Triage.App/
+          name: Guit-win-x64
+          path: artifacts/publish/Guit.App/
           if-no-files-found: error

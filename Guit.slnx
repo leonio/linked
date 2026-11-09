@@ -1,0 +1,16 @@
+<Solution>
+  <Configurations>
+    <Platform Name="x64" />
+    <Platform Name="ARM64" />
+  </Configurations>
+  <Folder Name="/src/">
+    <Project Path="src/Guit.Api/Guit.Api.csproj" />
+    <Project Path="src/Guit.Core/Guit.Core.csproj" />
+    <Project Path="src/Guit.App/Guit.App.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Guit.Api.Tests/Guit.Api.Tests.csproj" />
+    <Project Path="tests/Guit.Core.Tests/Guit.Core.Tests.csproj" />
+    <Project Path="tests/Guit.AotSmoke/Guit.AotSmoke.csproj" />
+  </Folder>
+</Solution>

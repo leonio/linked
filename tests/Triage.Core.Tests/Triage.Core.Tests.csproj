@@ -1,6 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <ItemGroup>
-    <ProjectReference Include="..\..\src\Triage.Core\Triage.Core.csproj" />
-    <PackageReference Include="TUnit" />
-  </ItemGroup>
-</Project>

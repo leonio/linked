@@ -1,13 +1,13 @@
 ---
 name: winui-xaml
-description: Rules, templates and known compiler traps for XAML and code-behind in src/Triage.App (WinUI 3, x:Bind only, Fluent design resources, lists, navigation, AOT-safe patterns). Load whenever a task touches Triage.App.
+description: Rules, templates and known compiler traps for XAML and code-behind in src/Guit.App (WinUI 3, x:Bind only, Fluent design resources, lists, navigation, AOT-safe patterns). Load whenever a task touches Guit.App.
 ---
 
-# WinUI XAML (Triage.App)
+# WinUI XAML (Guit.App)
 
 Worked examples to copy: `Views/ShellView.xaml`, `Views/SignInView.xaml`, `Xaml/Bind.cs`, `MainWindow.xaml`.
 
-Triage.App only builds on Windows. If you are elsewhere, write the XAML carefully against this skill, push,
+Guit.App only builds on Windows. If you are elsewhere, write the XAML carefully against this skill, push,
 and read the "WinUI app" job in CI. Say in your report that it was verified by CI only (or not at all).
 
 ## The rules
@@ -15,7 +15,7 @@ and read the "WinUI app" job in CI. Say in your report that it was verified by C
 1. **`{x:Bind}` only. Never `{Binding}`.** `{Binding}` uses reflection and breaks under Native AOT.
    `{StaticResource}` and `{ThemeResource}` are fine.
 2. **Every `DataTemplate` has `x:DataType`.** Without it `x:Bind` does not compile.
-3. **No `IValueConverter`.** Use a function from `Triage.App.Xaml.Bind`: `{x:Bind xaml:Bind.VisibleIf(ViewModel.IsEmpty), Mode=OneWay}`.
+3. **No `IValueConverter`.** Use a function from `Guit.App.Xaml.Bind`: `{x:Bind xaml:Bind.VisibleIf(ViewModel.IsEmpty), Mode=OneWay}`.
 4. **No logic in code-behind.** Code-behind may: get the view model from DI, call `InitializeComponent`, forward an
    event to a view model command, and do things only a view can do (focus, scroll into view, navigation frame).
 5. **Fluent by default.** Use WinUI controls with their default styles, the built-in text styles, and theme brushes.
@@ -36,7 +36,7 @@ and read the "WinUI app" job in CI. Say in your report that it was verified by C
 | image from URL | `Source="{x:Bind xaml:Bind.Image(AvatarUrl, 24)}"` (decodes at display size) |
 | Inside a `DataTemplate` | paths start at the item: `{x:Bind Title}`, not `{x:Bind ViewModel...}` |
 
-Add `xmlns:xaml="using:Triage.App.Xaml"` to use `Bind`. New helpers go in `Xaml/Bind.cs` as `public static` pure functions.
+Add `xmlns:xaml="using:Guit.App.Xaml"` to use `Bind`. New helpers go in `Xaml/Bind.cs` as `public static` pure functions.
 
 ## Compiler traps (each of these has already cost a CI run)
 
@@ -60,11 +60,11 @@ Add `xmlns:xaml="using:Triage.App.Xaml"` to use `Bind`. New helpers go in `Xaml/
 ```xml
 <?xml version="1.0" encoding="utf-8"?>
 <Page
-    x:Class="Triage.App.Views.InboxPage"
+    x:Class="Guit.App.Views.InboxPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:models="using:Triage.Core.Models"
-    xmlns:xaml="using:Triage.App.Xaml">
+    xmlns:models="using:Guit.Core.Models"
+    xmlns:xaml="using:Guit.App.Xaml">
   <Grid>
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto" />
