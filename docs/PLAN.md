@@ -28,7 +28,7 @@ one layer, one or two files plus tests, a worked example to copy.
 - [x] 1.3 Sign-in view, Credential Locker token store, launcher
 - [ ] 1.4 **[H]** Register the GitHub OAuth App, set the client id, sign in for real on Windows
 - [ ] 1.5 **[S]** Sign out automatically on HTTP 401 (adds `IUiDispatcher`)
-- [ ] 1.6 Friendly error messages (`ApiErrors.Describe`)
+- [x] 1.6 Friendly error messages (`ApiErrors.Describe`)
 
 ## Phase 2 - Inbox, the feed ([cards](tasks/phase-2-inbox.md))
 

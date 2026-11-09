@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Linked.Api.Users;
 using Linked.Core.Services;
+using Refit;
 
 namespace Linked.Core.ViewModels;
 
@@ -46,7 +47,7 @@ public sealed partial class ShellViewModel : ObservableObject
             Login = user.Login;
             AvatarUrl = user.AvatarUrl;
         }
-        catch (HttpRequestException)
+        catch (ApiExceptionBase)
         {
             // Offline or rate limited: the shell still works, it just has no name to show yet.
         }

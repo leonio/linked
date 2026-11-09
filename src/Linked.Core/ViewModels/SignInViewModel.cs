@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Linked.Api.Auth;
 using Linked.Core.Services;
+using Refit;
 
 namespace Linked.Core.ViewModels;
 
@@ -62,8 +63,13 @@ public sealed partial class SignInViewModel(
         {
             // The member pressed Cancel. Nothing to report.
         }
-        catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException)
+        catch (ApiExceptionBase ex)
         {
+            ErrorMessage = ApiErrors.Describe(ex);
+        }
+        catch (InvalidOperationException ex)
+        {
+            // DeviceFlow throws this for an error code it does not know.
             ErrorMessage = ex.Message;
         }
         finally

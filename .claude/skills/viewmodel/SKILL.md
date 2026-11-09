@@ -45,9 +45,9 @@ public sealed partial class InboxViewModel(INotificationsApi notifications) : Ob
         catch (OperationCanceledException)
         {
         }
-        catch (HttpRequestException ex)
+        catch (ApiExceptionBase ex)
         {
-            ErrorMessage = ex.Message;
+            ErrorMessage = ApiErrors.Describe(ex);
         }
         finally
         {
@@ -70,7 +70,11 @@ public sealed partial class InboxViewModel(INotificationsApi notifications) : Ob
 **Async and threads**
 - View model code runs on the UI thread and stays there: **never write `ConfigureAwait(false)` in Linked.Core**, never `Task.Run` around an API call (HTTP is already async), never `.Result` / `.Wait()`.
 - Only touch `ObservableCollection` and `[ObservableProperty]` values from view model methods (UI thread).
-- Catch `OperationCanceledException` (ignore) and `HttpRequestException` (set `ErrorMessage`) in every command that calls the API. `Refit.ApiException` derives from `HttpRequestException`. Never let an exception escape a command; never catch bare `Exception`.
+- Every command that calls the API has exactly these two catches: `catch (OperationCanceledException) { }` and
+  `catch (ApiExceptionBase ex) { ErrorMessage = ApiErrors.Describe(ex); }`.
+  Refit throws `Refit.ApiExceptionBase` for every failed call (error status **and** no connection). It does **not**
+  derive from `HttpRequestException`, so `catch (HttpRequestException)` catches nothing. Never let an exception
+  escape a command (it would crash the app); never catch bare `Exception`.
 
 **Data**
 - XAML never binds to `Linked.Api` DTOs. Map each DTO to an **item model** in `Linked.Core/Models/`:
@@ -105,6 +109,7 @@ File: `tests/Linked.Core.Tests/<Name>ViewModelTests.cs`.
 
 - Fakes are hand-written classes in `tests/Linked.Core.Tests/Fakes.cs`, one per interface, reused by every test. Add the new interface's fake there. No mocking library.
 - Run commands with `await viewModel.LoadCommand.ExecuteAsync(null);`.
+- A fake simulates a failed call with `Task.FromException<T>(Failure.Status(HttpStatusCode.NotFound))` (`Failure` is in `Fakes.cs`).
 - Minimum tests per view model: success path fills the state; API failure sets `ErrorMessage` and leaves `IsLoading` false; each command that changes state.
 - Then add a `Check(...)` for the view model to `tests/Linked.AotSmoke/Program.cs`.
 

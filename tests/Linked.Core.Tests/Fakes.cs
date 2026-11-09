@@ -1,10 +1,29 @@
+using System.Net;
 using Linked.Api.Auth;
+using Linked.Api.Http;
 using Linked.Api.Users;
 using Linked.Core.Services;
+using Refit;
 
 namespace Linked.Core.Tests;
 
 // Hand-written fakes: one small class per interface, shared by every test. No mocking library.
+
+/// <summary>Builds the exceptions Refit throws, for fakes that simulate a failed call.</summary>
+internal static class Failure
+{
+    /// <summary>GitHub answered with an error status.</summary>
+    public static ApiException Status(HttpStatusCode status, bool rateLimited = false)
+    {
+        HttpResponseMessage response = new(status);
+        if (rateLimited)
+        {
+            response.Headers.Add("x-ratelimit-remaining", "0");
+        }
+
+        return ApiException.Create(new HttpRequestMessage(), HttpMethod.Get, response, GitHubRefit.CreateSettings()).GetAwaiter().GetResult();
+    }
+}
 
 internal sealed class FakeTokenStore(string? token = null) : ITokenStore
 {
@@ -36,7 +55,7 @@ internal sealed class FakeUsersApi(GitHubUser? user) : IUsersApi
 {
     public Task<GitHubUser> GetAuthenticatedAsync(CancellationToken cancellationToken)
         => user is null
-            ? Task.FromException<GitHubUser>(new HttpRequestException("offline"))
+            ? Task.FromException<GitHubUser>(Failure.Status(HttpStatusCode.InternalServerError))
             : Task.FromResult(user);
 }
 
