@@ -21,11 +21,7 @@
         Style="{StaticResource AccentButtonStyle}"
         Visibility="{x:Bind xaml:Bind.Not(ViewModel.HasUserCode), Mode=OneWay}" />
 
-    <!-- x:Load: this block is not created at all until a code exists. -->
-    <StackPanel
-        x:Name="CodePanel"
-        x:Load="{x:Bind ViewModel.HasUserCode, Mode=OneWay}"
-        Spacing="12">
+    <StackPanel Spacing="12" Visibility="{x:Bind ViewModel.HasUserCode, Mode=OneWay}">
       <TextBlock
           HorizontalAlignment="Center"
           HorizontalTextAlignment="Center"
