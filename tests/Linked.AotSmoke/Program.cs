@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text;
+using Linked.Api.Notifications;
 using Linked.Api.Users;
 using Linked.Core;
 using Linked.Core.Services;
@@ -24,6 +25,12 @@ Check(provider.GetRequiredService<Session>().IsSignedIn, "device flow sign-in");
 
 GitHubUser user = await provider.GetRequiredService<IUsersApi>().GetAuthenticatedAsync(CancellationToken.None);
 Check(user is { Login: "octocat", Id: 583231 }, "users api");
+
+INotificationsApi notifications = provider.GetRequiredService<INotificationsApi>();
+NotificationThread[] threads = await notifications.ListAsync(all: false, participating: false, page: 1, perPage: 50, CancellationToken.None);
+Check(threads is [{ Id: "1", Subject.Type: "PullRequest", Repository.Owner.Login: "octocat" }], "notifications api: list");
+await notifications.MarkAsReadAsync("1", CancellationToken.None);
+Check(true, "notifications api: mark as read");
 
 ShellViewModel shell = provider.GetRequiredService<ShellViewModel>();
 await shell.LoadUserCommand.ExecuteAsync(null);
@@ -74,11 +81,15 @@ internal sealed class CannedHandler : HttpMessageHandler
             "/login/device/code" => """{"device_code":"dev","user_code":"AAAA-BBBB","verification_uri":"https://github.com/login/device","expires_in":900,"interval":0}""",
             "/login/oauth/access_token" => """{"access_token":"gho_smoke","token_type":"bearer","scope":"repo"}""",
             "/user" when authorized => """{"login":"octocat","id":583231,"avatar_url":"https://avatars/1","html_url":"https://github.com/octocat"}""",
+            "/notifications" when authorized => """[{"id":"1","unread":true,"reason":"review_requested","updated_at":"2026-01-02T03:04:05Z","last_read_at":null,"subject":{"title":"Fix it","type":"PullRequest","url":"https://api.github.com/repos/octocat/hello/pulls/7","latest_comment_url":null},"repository":{"id":9,"name":"hello","full_name":"octocat/hello","private":false,"html_url":"https://github.com/octocat/hello","owner":{"login":"octocat","id":583231,"avatar_url":"https://avatars/1","html_url":"https://github.com/octocat"}}}]""",
+            "/notifications/threads/1" when authorized => string.Empty,
             _ => null,
         };
 
         HttpResponseMessage response = json is null
             ? new HttpResponseMessage(HttpStatusCode.NotFound)
+            : json.Length == 0
+            ? new HttpResponseMessage(HttpStatusCode.ResetContent)
             : new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json, Encoding.UTF8, "application/json") };
         return Task.FromResult(response);
     }

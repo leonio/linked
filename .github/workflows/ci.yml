@@ -49,6 +49,18 @@ jobs:
           $exe = Get-Item (Join-Path $dir.FullName 'Linked.exe')
           $total = (Get-ChildItem $dir.FullName -Recurse -File | Measure-Object Length -Sum).Sum
           "Linked.exe: {0:N1} MB; publish folder: {1:N1} MB" -f ($exe.Length / 1MB), ($total / 1MB) | Tee-Object -FilePath $env:GITHUB_STEP_SUMMARY -Append
+      - name: Launch smoke test (the native exe must start and show a window)
+        shell: pwsh
+        run: |
+          $dir = Get-ChildItem artifacts/publish/Linked.App -Directory | Select-Object -First 1
+          $app = Start-Process -FilePath (Join-Path $dir.FullName 'Linked.exe') -PassThru
+          Start-Sleep -Seconds 12
+          $app.Refresh()
+          if ($app.HasExited) { throw "Linked.exe exited during start-up with code $($app.ExitCode)" }
+          $hasWindow = $app.MainWindowHandle -ne 0
+          "Launch smoke: running after 12 s, window created: $hasWindow, working set: {0:N0} MB" -f ($app.WorkingSet64 / 1MB) | Tee-Object -FilePath $env:GITHUB_STEP_SUMMARY -Append
+          Stop-Process -Id $app.Id -Force
+          if (-not $hasWindow) { throw "Linked.exe started but never created a window" }
       - uses: actions/upload-artifact@v4
         with:
           name: Linked-win-x64

@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text;
+using Linked.Api.Http;
 using Refit;
 using Refit.Testing;
 
@@ -13,12 +14,12 @@ internal static class Stub
     /// <summary>The normal case: routes and JSON replies declared on a <see cref="StubHttp"/>.</summary>
     public static T Client<T>(StubHttp http)
         where T : class
-        => http.CreateGeneratedClient<T>(Host, RefitSettings.ForJsonContext(GitHubJsonContext.Default));
+        => http.CreateGeneratedClient<T>(Host, GitHubRefit.CreateSettings());
 
     /// <summary>For requests whose body is not JSON (forms): replies with one canned JSON body and records the raw request text.</summary>
     public static T Client<T>(RecordingHandler handler)
         where T : class
-        => RestService.ForGenerated<T>(new HttpClient(handler) { BaseAddress = new Uri(Host) }, GitHubJsonContext.Default);
+        => RestService.ForGenerated<T>(new HttpClient(handler) { BaseAddress = new Uri(Host) }, GitHubRefit.CreateSettings());
 }
 
 internal sealed class RecordingHandler(string replyJson) : HttpMessageHandler

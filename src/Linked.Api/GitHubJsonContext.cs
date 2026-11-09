@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Linked.Api.Auth;
+using Linked.Api.Notifications;
 using Linked.Api.Users;
 
 namespace Linked.Api;
@@ -18,6 +19,8 @@ namespace Linked.Api;
 // Auth
 [JsonSerializable(typeof(DeviceCode))]
 [JsonSerializable(typeof(DeviceTokenResponse))]
+// Notifications
+[JsonSerializable(typeof(NotificationThread[]))]
 // Users
 [JsonSerializable(typeof(GitHubUser))]
 public sealed partial class GitHubJsonContext : JsonSerializerContext;

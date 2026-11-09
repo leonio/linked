@@ -1,6 +1,6 @@
-using System.Text.Json.Serialization;
 using Linked.Api.Auth;
 using Linked.Api.Http;
+using Linked.Api.Notifications;
 using Linked.Api.Users;
 using Microsoft.Extensions.DependencyInjection;
 using Refit;
@@ -20,19 +20,20 @@ public static class LinkedApiServiceCollectionExtensions
     {
         primaryHandler ??= LinkedHttp.CreateHandler;
 
-        services.AddRefitGeneratedClient<IGitHubDeviceFlowApi>(GitHubJsonContext.Default)
+        services.AddRefitGeneratedClient<IGitHubDeviceFlowApi>(GitHubRefit.CreateSettings())
             .ConfigureHttpClient(static client => LinkedHttp.Configure(client, GitHubEndpoints.WebBase))
             .ConfigurePrimaryHttpMessageHandler(primaryHandler);
 
         // One line per authenticated API interface. Keep sorted.
-        services.AddGitHubApi<IUsersApi>(GitHubJsonContext.Default, primaryHandler);
+        services.AddGitHubApi<INotificationsApi>(primaryHandler);
+        services.AddGitHubApi<IUsersApi>(primaryHandler);
 
         return services;
     }
 
-    private static void AddGitHubApi<T>(this IServiceCollection services, JsonSerializerContext context, Func<HttpMessageHandler> primaryHandler)
+    private static void AddGitHubApi<T>(this IServiceCollection services, Func<HttpMessageHandler> primaryHandler)
         where T : class
-        => services.AddRefitGeneratedClient<T>(context)
+        => services.AddRefitGeneratedClient<T>(GitHubRefit.CreateSettings())
             .ConfigureHttpClient(static client => LinkedHttp.ConfigureApi(client))
             .ConfigurePrimaryHttpMessageHandler(primaryHandler)
             .AddAuthorizationHeaderValueProvider(static (provider, _, cancellationToken) =>
