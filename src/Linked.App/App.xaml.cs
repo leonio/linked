@@ -16,7 +16,10 @@ public partial class App : Application
         Services = ConfigureServices();
     }
 
-    /// <summary>The composition root. Resolve from here only in view constructors; everything else takes constructor parameters.</summary>
+    /// <summary>
+    /// The composition root. Resolve from here only in view constructors (windows, pages, user controls).
+    /// Everything else takes constructor parameters.
+    /// </summary>
     public static ServiceProvider Services { get; private set; } = null!;
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)
@@ -28,7 +31,9 @@ public partial class App : Application
     private static ServiceProvider ConfigureServices()
     {
         ServiceCollection services = new();
-        services.AddSingleton<ISessionService, SessionService>();
+        services.AddSingleton(new GitHubOptions(AppConfig.GitHubClientId));
+        services.AddSingleton<ITokenStore, PasswordVaultTokenStore>();
+        services.AddSingleton<ILauncher, Launcher>();
         services.AddLinkedCore();
         return services.BuildServiceProvider();
     }

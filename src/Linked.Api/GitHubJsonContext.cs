@@ -1,0 +1,23 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using Linked.Api.Auth;
+using Linked.Api.Users;
+
+namespace Linked.Api;
+
+/// <summary>
+/// Source-generated JSON metadata for every GitHub request and reply type. GitHub uses snake_case.
+/// A type sent through a Refit client MUST be listed here (and its array, if a method returns one):
+/// a missing type throws <see cref="NotSupportedException"/> at run time, not at build time.
+/// Keep the list sorted by area.
+/// </summary>
+[JsonSourceGenerationOptions(
+    JsonSerializerDefaults.Web,
+    PropertyNamingPolicy = JsonKnownNamingPolicy.SnakeCaseLower,
+    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
+// Auth
+[JsonSerializable(typeof(DeviceCode))]
+[JsonSerializable(typeof(DeviceTokenResponse))]
+// Users
+[JsonSerializable(typeof(GitHubUser))]
+public sealed partial class GitHubJsonContext : JsonSerializerContext;

@@ -1,69 +1,71 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using Linked.Api.Identity;
+using Linked.Api.Users;
 using Linked.Core.Services;
 
 namespace Linked.Core.ViewModels;
 
-/// <summary>State for the main window: who is signed in, and the sign-in / sign-out commands.</summary>
-public sealed partial class ShellViewModel(ISessionService session, IIdentityApi identity) : ObservableObject
+/// <summary>State for the main window: whether someone is signed in, and who.</summary>
+public sealed partial class ShellViewModel : ObservableObject
 {
+    private readonly Session _session;
+    private readonly IUsersApi _users;
+
+    public ShellViewModel(Session session, IUsersApi users)
+    {
+        _session = session;
+        _users = users;
+        IsSignedIn = session.IsSignedIn;
+        session.Changed += OnSessionChanged;
+    }
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsSignedOut))]
-    public partial bool IsSignedIn { get; private set; } = session.IsSignedIn;
+    public partial bool IsSignedIn { get; private set; }
 
     [ObservableProperty]
-    public partial string DisplayName { get; private set; } = string.Empty;
+    public partial string Login { get; private set; } = string.Empty;
 
     [ObservableProperty]
-    public partial string? PictureUrl { get; private set; }
-
-    [ObservableProperty]
-    public partial string? ErrorMessage { get; private set; }
+    public partial string? AvatarUrl { get; private set; }
 
     public bool IsSignedOut => !IsSignedIn;
 
-    /// <summary>Call once when the window opens. Restores the member if a session already exists.</summary>
+    /// <summary>Loads the signed-in user. Run once when the window opens, and again after each sign-in.</summary>
     [RelayCommand]
-    private async Task InitializeAsync(CancellationToken cancellationToken)
+    private async Task LoadUserAsync(CancellationToken cancellationToken)
     {
-        if (session.IsSignedIn)
+        if (!_session.IsSignedIn)
         {
-            await LoadMemberAsync(cancellationToken);
+            return;
         }
-    }
 
-    [RelayCommand]
-    private async Task SignInAsync(CancellationToken cancellationToken)
-    {
-        ErrorMessage = null;
-        if (await session.SignInAsync(cancellationToken))
-        {
-            await LoadMemberAsync(cancellationToken);
-        }
-    }
-
-    [RelayCommand]
-    private async Task SignOutAsync(CancellationToken cancellationToken)
-    {
-        await session.SignOutAsync(cancellationToken);
-        IsSignedIn = false;
-        DisplayName = string.Empty;
-        PictureUrl = null;
-    }
-
-    private async Task LoadMemberAsync(CancellationToken cancellationToken)
-    {
         try
         {
-            UserInfo member = await identity.GetUserInfoAsync(cancellationToken);
-            DisplayName = member.Name ?? string.Empty;
-            PictureUrl = member.Picture;
-            IsSignedIn = true;
+            GitHubUser user = await _users.GetAuthenticatedAsync(cancellationToken);
+            Login = user.Login;
+            AvatarUrl = user.AvatarUrl;
         }
-        catch (HttpRequestException ex)
+        catch (HttpRequestException)
         {
-            ErrorMessage = ex.Message;
+            // Offline or rate limited: the shell still works, it just has no name to show yet.
+        }
+    }
+
+    [RelayCommand]
+    private void SignOut() => _session.SignOut();
+
+    private void OnSessionChanged(object? sender, EventArgs e)
+    {
+        IsSignedIn = _session.IsSignedIn;
+        if (IsSignedIn)
+        {
+            LoadUserCommand.Execute(null);
+        }
+        else
+        {
+            Login = string.Empty;
+            AvatarUrl = null;
         }
     }
 }

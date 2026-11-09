@@ -16,22 +16,30 @@ public sealed partial class MainWindow : Window
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(AppTitleBar);
 
-        // Select after InitializeComponent so ContentFrame exists when SelectionChanged fires.
-        Navigation.SelectedItem = Navigation.MenuItems[0];
-        ViewModel.InitializeCommand.Execute(null);
+        ViewModel.LoadUserCommand.Execute(null);
     }
 
     public ShellViewModel ViewModel { get; }
 
+    private void OnNavigationLoaded(object sender, RoutedEventArgs e)
+    {
+        NavigationView navigation = (NavigationView)sender;
+        navigation.SelectedItem ??= navigation.MenuItems[0];
+    }
+
     private void OnNavigationSelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
     {
-        // Navigate by type token, never by string name: typeof keeps the page visible to the trimmer.
+        // Navigate by typeof, never by a type name string: typeof keeps the page visible to the trimmer.
         Type page = (args.SelectedItem as NavigationViewItem)?.Tag switch
         {
-            "messaging" => typeof(PlaceholderPage),
+            "pulls" => typeof(PlaceholderPage),
             _ => typeof(PlaceholderPage),
         };
 
-        ContentFrame.Navigate(page);
+        // x:Load creates ContentFrame together with the NavigationView, so resolve it through the sender.
+        if (sender.Content is Frame frame)
+        {
+            frame.Navigate(page);
+        }
     }
 }

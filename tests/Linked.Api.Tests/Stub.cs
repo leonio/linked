@@ -1,6 +1,5 @@
 using System.Net;
 using System.Text;
-using System.Text.Json.Serialization;
 using Refit;
 using Refit.Testing;
 
@@ -12,14 +11,14 @@ internal static class Stub
     public const string Host = "https://stub.test";
 
     /// <summary>The normal case: routes and JSON replies declared on a <see cref="StubHttp"/>.</summary>
-    public static T Client<T>(StubHttp http, JsonSerializerContext context)
+    public static T Client<T>(StubHttp http)
         where T : class
-        => http.CreateGeneratedClient<T>(Host, RefitSettings.ForJsonContext(context));
+        => http.CreateGeneratedClient<T>(Host, RefitSettings.ForJsonContext(GitHubJsonContext.Default));
 
     /// <summary>For requests whose body is not JSON (forms): replies with one canned JSON body and records the raw request text.</summary>
-    public static T Client<T>(RecordingHandler handler, JsonSerializerContext context)
+    public static T Client<T>(RecordingHandler handler)
         where T : class
-        => RestService.ForGenerated<T>(new HttpClient(handler) { BaseAddress = new Uri(Host) }, context);
+        => RestService.ForGenerated<T>(new HttpClient(handler) { BaseAddress = new Uri(Host) }, GitHubJsonContext.Default);
 }
 
 internal sealed class RecordingHandler(string replyJson) : HttpMessageHandler

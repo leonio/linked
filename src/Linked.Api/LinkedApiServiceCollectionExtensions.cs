@@ -1,6 +1,7 @@
+using System.Text.Json.Serialization;
 using Linked.Api.Auth;
 using Linked.Api.Http;
-using Linked.Api.Identity;
+using Linked.Api.Users;
 using Microsoft.Extensions.DependencyInjection;
 using Refit;
 
@@ -19,16 +20,21 @@ public static class LinkedApiServiceCollectionExtensions
     {
         primaryHandler ??= LinkedHttp.CreateHandler;
 
-        services.AddRefitGeneratedClient<ILinkedInOAuthApi>(LinkedInOAuthJsonContext.Default)
-            .ConfigureHttpClient(static client => LinkedHttp.Configure(client, LinkedInEndpoints.OAuthBase))
+        services.AddRefitGeneratedClient<IGitHubDeviceFlowApi>(GitHubJsonContext.Default)
+            .ConfigureHttpClient(static client => LinkedHttp.Configure(client, GitHubEndpoints.WebBase))
             .ConfigurePrimaryHttpMessageHandler(primaryHandler);
 
-        services.AddRefitGeneratedClient<IIdentityApi>(LinkedInOAuthJsonContext.Default)
-            .ConfigureHttpClient(static client => LinkedHttp.Configure(client, LinkedInEndpoints.ApiBase))
-            .ConfigurePrimaryHttpMessageHandler(primaryHandler)
-            .AddAuthorizationHeaderValueProvider(static (provider, _, cancellationToken) =>
-                provider.GetRequiredService<IAccessTokenProvider>().GetAccessTokenAsync(cancellationToken));
+        // One line per authenticated API interface. Keep sorted.
+        services.AddGitHubApi<IUsersApi>(GitHubJsonContext.Default, primaryHandler);
 
         return services;
     }
+
+    private static void AddGitHubApi<T>(this IServiceCollection services, JsonSerializerContext context, Func<HttpMessageHandler> primaryHandler)
+        where T : class
+        => services.AddRefitGeneratedClient<T>(context)
+            .ConfigureHttpClient(static client => LinkedHttp.ConfigureApi(client))
+            .ConfigurePrimaryHttpMessageHandler(primaryHandler)
+            .AddAuthorizationHeaderValueProvider(static (provider, _, cancellationToken) =>
+                provider.GetRequiredService<IAccessTokenProvider>().GetAccessTokenAsync(cancellationToken));
 }

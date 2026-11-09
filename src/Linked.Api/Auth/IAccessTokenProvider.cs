@@ -1,8 +1,8 @@
 namespace Linked.Api.Auth;
 
 /// <summary>
-/// Supplies the bearer token for authenticated calls. Implemented by the app layer,
-/// which owns secure storage. Return an empty string when signed out.
+/// Supplies the bearer token for authenticated calls. Implemented by Linked.Core's Session.
+/// Return an empty string when signed out.
 /// </summary>
 public interface IAccessTokenProvider
 {

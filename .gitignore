@@ -1,4 +1,5 @@
 artifacts/
+.cache/
 bin/
 obj/
 .vs/

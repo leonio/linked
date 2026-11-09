@@ -1,4 +1,4 @@
-using Linked.Api.Identity;
+using Linked.Api.Users;
 using Linked.Core.Services;
 using Linked.Core.ViewModels;
 
@@ -6,69 +6,45 @@ namespace Linked.Core.Tests;
 
 public sealed class ShellViewModelTests
 {
+    private static readonly GitHubUser Octocat = new(1, "octocat", "https://avatars/1", "https://github.com/octocat");
+
     [Test]
-    public async Task SignIn_loads_the_member_and_raises_property_changes()
+    public async Task A_stored_token_starts_the_shell_signed_in()
     {
-        FakeSession session = new() { SignInResult = true };
-        ShellViewModel viewModel = new(session, new FakeIdentity(new UserInfo("id", Name: "Ada Lovelace")));
+        ShellViewModel viewModel = new(new Session(new FakeTokenStore("gho_abc")), new FakeUsersApi(Octocat));
+
+        await viewModel.LoadUserCommand.ExecuteAsync(null);
+
+        await Assert.That(viewModel.IsSignedIn).IsTrue();
+        await Assert.That(viewModel.Login).IsEqualTo("octocat");
+    }
+
+    [Test]
+    public async Task Signing_in_and_out_updates_the_shell_and_raises_IsSignedOut()
+    {
+        Session session = new(new FakeTokenStore());
+        ShellViewModel viewModel = new(session, new FakeUsersApi(Octocat));
         List<string?> changed = [];
         viewModel.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
 
-        await viewModel.SignInCommand.ExecuteAsync(null);
+        session.SignIn("gho_abc");
+        await Assert.That(viewModel.IsSignedIn).IsTrue();
+        await Assert.That(viewModel.Login).IsEqualTo("octocat");
+        await Assert.That(changed).Contains(nameof(ShellViewModel.IsSignedOut));
+
+        viewModel.SignOutCommand.Execute(null);
+        await Assert.That(viewModel.IsSignedIn).IsFalse();
+        await Assert.That(viewModel.Login).IsEqualTo(string.Empty);
+    }
+
+    [Test]
+    public async Task A_failed_user_request_does_not_sign_the_member_out()
+    {
+        ShellViewModel viewModel = new(new Session(new FakeTokenStore("gho_abc")), new FakeUsersApi(null));
+
+        await viewModel.LoadUserCommand.ExecuteAsync(null);
 
         await Assert.That(viewModel.IsSignedIn).IsTrue();
-        await Assert.That(viewModel.IsSignedOut).IsFalse();
-        await Assert.That(viewModel.DisplayName).IsEqualTo("Ada Lovelace");
-        await Assert.That(changed).Contains(nameof(ShellViewModel.IsSignedOut));
-    }
-
-    [Test]
-    public async Task SignIn_cancelled_by_the_member_leaves_the_shell_signed_out()
-    {
-        ShellViewModel viewModel = new(new FakeSession { SignInResult = false }, new FakeIdentity(new UserInfo("id")));
-
-        await viewModel.SignInCommand.ExecuteAsync(null);
-
-        await Assert.That(viewModel.IsSignedIn).IsFalse();
-    }
-
-    [Test]
-    public async Task A_failed_profile_request_surfaces_an_error_message()
-    {
-        ShellViewModel viewModel = new(new FakeSession { SignInResult = true }, new FakeIdentity(null));
-
-        await viewModel.SignInCommand.ExecuteAsync(null);
-
-        await Assert.That(viewModel.IsSignedIn).IsFalse();
-        await Assert.That(viewModel.ErrorMessage).IsNotNull();
-    }
-
-    private sealed class FakeSession : ISessionService
-    {
-        public bool SignInResult { get; init; }
-
-        public bool IsSignedIn { get; private set; }
-
-        public ValueTask<string> GetAccessTokenAsync(CancellationToken cancellationToken) => new("token");
-
-        public Task<bool> SignInAsync(CancellationToken cancellationToken)
-        {
-            IsSignedIn = SignInResult;
-            return Task.FromResult(SignInResult);
-        }
-
-        public Task SignOutAsync(CancellationToken cancellationToken)
-        {
-            IsSignedIn = false;
-            return Task.CompletedTask;
-        }
-    }
-
-    private sealed class FakeIdentity(UserInfo? member) : IIdentityApi
-    {
-        public Task<UserInfo> GetUserInfoAsync(CancellationToken cancellationToken)
-            => member is null
-                ? Task.FromException<UserInfo>(new HttpRequestException("offline"))
-                : Task.FromResult(member);
+        await Assert.That(viewModel.Login).IsEqualTo(string.Empty);
     }
 }
