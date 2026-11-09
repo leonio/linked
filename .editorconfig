@@ -1,0 +1,26 @@
+root = true
+
+[*]
+indent_style = space
+indent_size = 4
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+charset = utf-8
+
+[*.{csproj,props,targets,slnx,xaml,yml,json,manifest}]
+indent_size = 2
+
+[*.cs]
+csharp_style_namespace_declarations = file_scoped:warning
+csharp_using_directive_placement = outside_namespace:warning
+dotnet_style_require_accessibility_modifiers = for_non_interface_members:warning
+csharp_style_var_for_built_in_types = false:suggestion
+csharp_style_var_when_type_is_apparent = true:suggestion
+csharp_prefer_braces = true:warning
+dotnet_sort_system_directives_first = true
+
+# Library code never needs to resume on a captured context, and the UI layer wants to.
+dotnet_diagnostic.CA2007.severity = none
+# Public API surface is internal to this app; no need for XML docs on everything.
+dotnet_diagnostic.CS1591.severity = none

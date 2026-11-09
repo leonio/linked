@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Linked.Api\Linked.Api.csproj" />
+    <PackageReference Include="TUnit" />
+    <PackageReference Include="Refit.Testing" />
+  </ItemGroup>
+</Project>

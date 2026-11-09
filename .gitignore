@@ -1,0 +1,9 @@
+artifacts/
+bin/
+obj/
+.vs/
+*.user
+*.binlog
+AppPackages/
+BundleArtifacts/
+TestResults/

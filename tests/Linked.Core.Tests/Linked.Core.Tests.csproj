@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Linked.Core\Linked.Core.csproj" />
+    <PackageReference Include="TUnit" />
+  </ItemGroup>
+</Project>

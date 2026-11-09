@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  core:
+    name: API + Core (tests, Native AOT smoke)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Test Linked.Api
+        run: dotnet test --project tests/Linked.Api.Tests -c Release
+      - name: Test Linked.Core
+        run: dotnet test --project tests/Linked.Core.Tests -c Release
+      - name: Publish AOT smoke
+        run: dotnet publish tests/Linked.AotSmoke -c Release -r linux-x64
+      - name: Run AOT smoke
+        run: ./artifacts/publish/Linked.AotSmoke/release_linux-x64/Linked.AotSmoke
+
+  app:
+    name: WinUI app (build, Native AOT publish)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Build
+        run: dotnet build src/Linked.App -c Release -p:Platform=x64
+      - name: Publish Native AOT
+        run: dotnet publish src/Linked.App -c Release -r win-x64 -p:Platform=x64
+      - name: Report binary size
+        shell: pwsh
+        run: |
+          $dir = Get-ChildItem artifacts/publish/Linked.App -Directory | Select-Object -First 1
+          $exe = Get-Item (Join-Path $dir.FullName 'Linked.exe')
+          $total = (Get-ChildItem $dir.FullName -Recurse -File | Measure-Object Length -Sum).Sum
+          "Linked.exe: {0:N1} MB; publish folder: {1:N1} MB" -f ($exe.Length / 1MB), ($total / 1MB) | Tee-Object -FilePath $env:GITHUB_STEP_SUMMARY -Append
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Linked-win-x64
+          path: artifacts/publish/Linked.App/
+          if-no-files-found: error
