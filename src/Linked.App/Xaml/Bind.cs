@@ -1,3 +1,4 @@
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
 
@@ -11,6 +12,11 @@ namespace Linked.App.Xaml;
 public static class Bind
 {
     public static bool Not(bool value) => !value;
+
+    /// <summary>For Visibility targets. A function result is not converted from bool for you: return Visibility.</summary>
+    public static Visibility VisibleIf(bool value) => value ? Visibility.Visible : Visibility.Collapsed;
+
+    public static Visibility VisibleIfNot(bool value) => value ? Visibility.Collapsed : Visibility.Visible;
 
     public static bool IsNotEmpty(string? value) => !string.IsNullOrEmpty(value);
 

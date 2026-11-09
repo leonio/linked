@@ -19,7 +19,7 @@
         Command="{x:Bind ViewModel.SignInCommand}"
         Content="Sign in with GitHub"
         Style="{StaticResource AccentButtonStyle}"
-        Visibility="{x:Bind xaml:Bind.Not(ViewModel.HasUserCode), Mode=OneWay}" />
+        Visibility="{x:Bind xaml:Bind.VisibleIfNot(ViewModel.HasUserCode), Mode=OneWay}" />
 
     <StackPanel Spacing="12" Visibility="{x:Bind ViewModel.HasUserCode, Mode=OneWay}">
       <TextBlock
