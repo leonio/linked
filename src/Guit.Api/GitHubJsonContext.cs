@@ -21,7 +21,9 @@ namespace Guit.Api;
 [JsonSerializable(typeof(DeviceCode))]
 [JsonSerializable(typeof(DeviceTokenResponse))]
 // Issues
+[JsonSerializable(typeof(CreateCommentRequest))]
 [JsonSerializable(typeof(Issue))]
+[JsonSerializable(typeof(IssueComment))]
 [JsonSerializable(typeof(IssueComment[]))]
 // Notifications
 [JsonSerializable(typeof(NotificationThread[]))]

@@ -22,4 +22,13 @@ public interface IIssuesApi
         int page,
         [AliasAs("per_page")] int perPage,
         CancellationToken cancellationToken);
+
+    /// <summary>operationId: issues/create-comment</summary>
+    [Post("/repos/{owner}/{repo}/issues/{issueNumber}/comments")]
+    Task<IssueComment> CreateCommentAsync(
+        string owner,
+        string repo,
+        int issueNumber,
+        [Body] CreateCommentRequest request,
+        CancellationToken cancellationToken);
 }

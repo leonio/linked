@@ -35,6 +35,10 @@ public sealed record IssueComment(
     string? AuthorAssociation = null,
     ReactionRollup? Reactions = null);
 
+/// <summary>Request body of issues/create-comment.</summary>
+/// <param name="Body">The comment text, in Markdown.</param>
+public sealed record CreateCommentRequest(string Body);
+
 /// <summary>Schema: reaction-rollup. The thumbs are named "+1" and "-1" in JSON.</summary>
 public sealed record ReactionRollup(
     int TotalCount,

@@ -68,4 +68,18 @@ public sealed class IssuesApiTests
         await Assert.That(comments[1].User).IsNull();
         await Assert.That(comments[1].BodyText).IsNull();
     }
+
+    [Test]
+    public async Task CreateComment_posts_the_body_as_json()
+    {
+        using RecordingHandler http = new("""{"id":13,"created_at":"2026-01-04T00:00:00Z","html_url":"https://github.com/o/r/issues/2#issuecomment-13","user":{"login":"me","id":3,"avatar_url":"https://avatars/3","html_url":"https://github.com/me"},"body_text":"hello"}""");
+
+        IssueComment created = await Stub.Client<IIssuesApi>(http).CreateCommentAsync("o", "r", 2, new CreateCommentRequest("hello"), CancellationToken.None);
+
+        await Assert.That(http.Method).IsEqualTo(HttpMethod.Post);
+        await Assert.That(http.Path).IsEqualTo("/repos/o/r/issues/2/comments");
+        await Assert.That(http.Body).IsEqualTo("""{"body":"hello"}""");
+        await Assert.That(created.Id).IsEqualTo(13L);
+        await Assert.That(created.User!.Login).IsEqualTo("me");
+    }
 }

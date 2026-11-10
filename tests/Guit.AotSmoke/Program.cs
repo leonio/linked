@@ -39,6 +39,8 @@ Issue issue = await issues.GetAsync("octocat", "hello", 7, CancellationToken.Non
 Check(issue is { Number: 7, PullRequest: not null, Reactions.PlusOne: 2, User.Login: "octocat" }, "issues api: get");
 IssueComment[] comments = await issues.ListCommentsAsync("octocat", "hello", 7, page: 1, perPage: 50, CancellationToken.None);
 Check(comments is [{ Id: 11, BodyText: "Looks good", User: null }], "issues api: list comments");
+IssueComment posted = await issues.CreateCommentAsync("octocat", "hello", 7, new CreateCommentRequest("Thanks"), CancellationToken.None);
+Check(posted is { Id: 12, BodyText: "Thanks" }, "issues api: create comment");
 
 InboxViewModel inbox = provider.GetRequiredService<InboxViewModel>();
 await inbox.LoadCommand.ExecuteAsync(null);
@@ -101,6 +103,9 @@ internal sealed class NullLauncher : ILauncher
 /// <summary>Canned replies keyed by path. Authenticated paths require the token the device flow returned.</summary>
 internal sealed class CannedHandler : HttpMessageHandler
 {
+    private static string? ReadBody(HttpRequestMessage request)
+        => request.Content?.ReadAsStringAsync().GetAwaiter().GetResult();
+
     protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
         bool authorized = request.Headers.Authorization is { Scheme: "Bearer", Parameter: "gho_smoke" };
@@ -112,6 +117,8 @@ internal sealed class CannedHandler : HttpMessageHandler
             "/notifications" when authorized => """[{"id":"1","unread":true,"reason":"review_requested","updated_at":"2026-01-02T03:04:05Z","last_read_at":null,"subject":{"title":"Fix it","type":"PullRequest","url":"https://api.github.com/repos/octocat/hello/pulls/7","latest_comment_url":null},"repository":{"id":9,"name":"hello","full_name":"octocat/hello","private":false,"html_url":"https://github.com/octocat/hello","owner":{"login":"octocat","id":583231,"avatar_url":"https://avatars/1","html_url":"https://github.com/octocat"}}}]""",
             "/repos/octocat/hello/issues/7" when authorized => """{"id":70,"number":7,"title":"Fix it","state":"open","comments":1,"created_at":"2026-01-01T00:00:00Z","html_url":"https://github.com/octocat/hello/pull/7","user":{"login":"octocat","id":583231,"avatar_url":"https://avatars/1","html_url":"https://github.com/octocat"},"body_text":"Please review","body_html":"<p>Please <strong>review</strong></p>","pull_request":{"html_url":"https://github.com/octocat/hello/pull/7"},"reactions":{"total_count":2,"+1":2,"-1":0,"laugh":0,"confused":0,"heart":0,"hooray":0,"eyes":0,"rocket":0}}""",
             "/repos/octocat/hello/issues/7/comments" when authorized && request.Method == HttpMethod.Get => """[{"id":11,"created_at":"2026-01-02T00:00:00Z","html_url":"https://github.com/octocat/hello/pull/7#issuecomment-11","user":null,"body_text":"Looks good","body_html":"<p>Looks good</p>","author_association":"MEMBER"}]""",
+            "/repos/octocat/hello/issues/7/comments" when authorized && request.Method == HttpMethod.Post && ReadBody(request) == """{"body":"Thanks"}"""
+                => """{"id":12,"created_at":"2026-01-03T00:00:00Z","html_url":"https://github.com/octocat/hello/pull/7#issuecomment-12","user":{"login":"octocat","id":583231,"avatar_url":"https://avatars/1","html_url":"https://github.com/octocat"},"body_text":"Thanks","body_html":"<p>Thanks</p>"}""",
             "/notifications/threads/1" when authorized => string.Empty,
             _ => null,
         };
