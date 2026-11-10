@@ -33,7 +33,7 @@ one layer, one or two files plus tests, a worked example to copy.
 ## Phase 2 - Inbox, the feed ([cards](tasks/phase-2-inbox.md))
 
 - [x] 2.1 Notifications API: list, mark as read, mark as done
-- [ ] 2.2 `NotificationItem` model and `RelativeTime` helper
+- [x] 2.2 `NotificationItem` model and `RelativeTime` helper
 - [ ] 2.3 `InboxViewModel`: first page, loading and error state
 - [ ] 2.4 Navigation service (`INavigator`, `Route`)
 - [ ] 2.5 `InboxPage`: virtualised list with an item template

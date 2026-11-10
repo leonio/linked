@@ -1,6 +1,7 @@
 using System.Net;
 using Guit.Api.Auth;
 using Guit.Api.Http;
+using Guit.Api.Notifications;
 using Guit.Api.Users;
 using Guit.Core.Services;
 using Refit;
@@ -8,6 +9,38 @@ using Refit;
 namespace Guit.Core.Tests;
 
 // Hand-written fakes: one small class per interface, shared by every test. No mocking library.
+
+/// <summary>Sample API objects for tests.</summary>
+internal static class Sample
+{
+    public static readonly DateTimeOffset Now = new(2026, 6, 15, 12, 0, 0, TimeSpan.Zero);
+
+    public static NotificationThread Thread(
+        string id,
+        string title = "Fix it",
+        string type = "PullRequest",
+        bool unread = true,
+        string? url = "https://api.github.com/repos/octocat/hello/pulls/7")
+        => new(
+            id,
+            unread,
+            "review_requested",
+            Now.AddHours(-3),
+            new NotificationSubject(title, type, url),
+            new RepositorySummary(9, "hello", "octocat/hello", false, "https://github.com/octocat/hello",
+                new GitHubUser(1, "octocat", "https://avatars.githubusercontent.com/u/1?v=4", "https://github.com/octocat")));
+
+    public static NotificationThread[] Threads(int count, int firstId = 1)
+    {
+        NotificationThread[] threads = new NotificationThread[count];
+        for (int i = 0; i < count; i++)
+        {
+            threads[i] = Thread((firstId + i).ToString(System.Globalization.CultureInfo.InvariantCulture));
+        }
+
+        return threads;
+    }
+}
 
 /// <summary>Builds the exceptions Refit throws, for fakes that simulate a failed call.</summary>
 internal static class Failure
