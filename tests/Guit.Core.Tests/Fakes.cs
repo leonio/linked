@@ -10,6 +10,12 @@ namespace Guit.Core.Tests;
 
 // Hand-written fakes: one small class per interface, shared by every test. No mocking library.
 
+/// <summary>A clock that always reads the same instant.</summary>
+internal sealed class FixedTime(DateTimeOffset now) : TimeProvider
+{
+    public override DateTimeOffset GetUtcNow() => now;
+}
+
 /// <summary>Sample API objects for tests.</summary>
 internal static class Sample
 {
@@ -102,4 +108,52 @@ internal sealed class FakeDeviceFlowApi(params DeviceTokenResponse[] polls) : IG
 
     public Task<DeviceTokenResponse> PollTokenAsync(DeviceTokenRequest request, CancellationToken cancellationToken)
         => Task.FromResult(_polls.Dequeue());
+}
+
+/// <summary>Returns the queued pages in order (an empty page once they run out) and records every call.</summary>
+internal sealed class FakeNotificationsApi(params NotificationThread[][] pages) : INotificationsApi
+{
+    private readonly Queue<NotificationThread[]> _pages = new(pages);
+
+    /// <summary>When set, the next call fails with this status and the value is cleared.</summary>
+    public HttpStatusCode? FailNextWith { get; set; }
+
+    public List<(bool All, bool Participating, int Page, int PerPage)> ListCalls { get; } = [];
+
+    public List<string> MarkedRead { get; } = [];
+
+    public List<string> MarkedDone { get; } = [];
+
+    public void Enqueue(NotificationThread[] page) => _pages.Enqueue(page);
+
+    public Task<NotificationThread[]> ListAsync(bool all, bool participating, int page, int perPage, CancellationToken cancellationToken)
+    {
+        ListCalls.Add((all, participating, page, perPage));
+        return TakeFailure() is { } failure
+            ? Task.FromException<NotificationThread[]>(failure)
+            : Task.FromResult(_pages.Count > 0 ? _pages.Dequeue() : []);
+    }
+
+    public Task MarkAsReadAsync(string threadId, CancellationToken cancellationToken)
+    {
+        MarkedRead.Add(threadId);
+        return TakeFailure() is { } failure ? Task.FromException(failure) : Task.CompletedTask;
+    }
+
+    public Task MarkAsDoneAsync(string threadId, CancellationToken cancellationToken)
+    {
+        MarkedDone.Add(threadId);
+        return TakeFailure() is { } failure ? Task.FromException(failure) : Task.CompletedTask;
+    }
+
+    private ApiException? TakeFailure()
+    {
+        if (FailNextWith is not { } status)
+        {
+            return null;
+        }
+
+        FailNextWith = null;
+        return Failure.Status(status);
+    }
 }

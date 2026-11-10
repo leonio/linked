@@ -21,6 +21,7 @@ public static class GuitCoreServiceCollectionExtensions
         services.AddSingleton<IAccessTokenProvider>(static provider => provider.GetRequiredService<Session>());
 
         // View models. Shell-level ones are singletons; page-level ones are transient. Keep sorted.
+        services.AddTransient<InboxViewModel>();
         services.AddSingleton<ShellViewModel>();
         services.AddTransient<SignInViewModel>();
         return services;

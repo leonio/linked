@@ -32,6 +32,10 @@ Check(threads is [{ Id: "1", Subject.Type: "PullRequest", Repository.Owner.Login
 await notifications.MarkAsReadAsync("1", CancellationToken.None);
 Check(true, "notifications api: mark as read");
 
+InboxViewModel inbox = provider.GetRequiredService<InboxViewModel>();
+await inbox.LoadCommand.ExecuteAsync(null);
+Check(inbox.Items is [{ Title: "Fix it", Repository: "octocat/hello", IsUnread: true }], "inbox view model");
+
 ShellViewModel shell = provider.GetRequiredService<ShellViewModel>();
 await shell.LoadUserCommand.ExecuteAsync(null);
 Check(shell is { IsSignedIn: true, Login: "octocat" }, "shell view model");
