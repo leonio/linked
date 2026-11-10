@@ -4,6 +4,7 @@ using Guit.Api.Issues;
 using Guit.Api.Notifications;
 using Guit.Api.Pulls;
 using Guit.Api.Reactions;
+using Guit.Api.Search;
 using Guit.Api.Users;
 using Microsoft.Extensions.DependencyInjection;
 using Refit;
@@ -34,6 +35,7 @@ public static class GuitApiServiceCollectionExtensions
         services.AddGitHubApi<INotificationsApi>(primaryHandler);
         services.AddGitHubApi<IPullsApi>(primaryHandler);
         services.AddGitHubApi<IReactionsApi>(primaryHandler);
+        services.AddGitHubApi<ISearchApi>(primaryHandler);
         services.AddGitHubApi<IUsersApi>(primaryHandler);
 
         return services;

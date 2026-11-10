@@ -4,6 +4,7 @@ using Guit.Api.Issues;
 using Guit.Api.Notifications;
 using Guit.Api.Pulls;
 using Guit.Api.Reactions;
+using Guit.Api.Search;
 using Guit.Api.Users;
 using Guit.Core;
 using Guit.Core.Services;
@@ -52,6 +53,8 @@ await provider.GetRequiredService<IReactionsApi>().CreateForIssueCommentAsync("o
 Check(true, "reactions api: create");
 PullRequest pull = await provider.GetRequiredService<IPullsApi>().GetAsync("octocat", "hello", 7, CancellationToken.None);
 Check(pull is { Merged: false, Additions: 120, Head.Ref: "feature", Base.Ref: "main" }, "pulls api: get");
+IssueSearchResult found = await provider.GetRequiredService<ISearchApi>().SearchIssuesAsync("is:open is:pr author:@me", "updated", "desc", 1, 50, CancellationToken.None);
+Check(found is { TotalCount: 1, Items: [{ Number: 7, RepositoryUrl: "https://api.github.com/repos/octocat/hello" }] }, "search api: issues");
 
 InboxViewModel inbox = provider.GetRequiredService<InboxViewModel>();
 await inbox.LoadCommand.ExecuteAsync(null);
@@ -145,6 +148,7 @@ internal sealed class CannedHandler : HttpMessageHandler
                 => """{"id":12,"created_at":"2026-01-03T00:00:00Z","html_url":"https://github.com/octocat/hello/pull/7#issuecomment-12","user":{"login":"octocat","id":583231,"avatar_url":"https://avatars/1","html_url":"https://github.com/octocat"},"body_text":"Thanks","body_html":"<p>Thanks</p>"}""",
             "/repos/octocat/hello/issues/comments/11/reactions" when authorized && ReadBody(request) == """{"content":"heart"}""" => """{"id":1,"content":"heart"}""",
             "/repos/octocat/hello/pulls/7" when authorized => """{"number":7,"state":"open","merged":false,"draft":false,"mergeable":null,"additions":120,"deletions":8,"changed_files":5,"head":{"ref":"feature","label":"octocat:feature"},"base":{"ref":"main","label":"octocat:main"}}""",
+            "/search/issues" when authorized => """{"total_count":1,"incomplete_results":false,"items":[{"id":70,"number":7,"title":"Fix it","state":"open","comments":2,"updated_at":"2026-01-02T00:00:00Z","html_url":"https://github.com/octocat/hello/pull/7","repository_url":"https://api.github.com/repos/octocat/hello","user":{"login":"octocat","id":583231,"avatar_url":"https://avatars/1","html_url":"https://github.com/octocat"},"draft":false}]}""",
             "/notifications/threads/1" when authorized => string.Empty,
             _ => null,
         };

@@ -5,6 +5,7 @@ using Guit.Api.Issues;
 using Guit.Api.Notifications;
 using Guit.Api.Pulls;
 using Guit.Api.Reactions;
+using Guit.Api.Search;
 using Guit.Api.Users;
 
 namespace Guit.Api;
@@ -33,6 +34,8 @@ namespace Guit.Api;
 [JsonSerializable(typeof(PullRequest))]
 // Reactions
 [JsonSerializable(typeof(CreateReactionRequest))]
+// Search
+[JsonSerializable(typeof(IssueSearchResult))]
 // Users
 [JsonSerializable(typeof(GitHubUser))]
 public sealed partial class GitHubJsonContext : JsonSerializerContext;
