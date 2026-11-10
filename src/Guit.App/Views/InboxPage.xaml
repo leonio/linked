@@ -11,10 +11,23 @@
       <RowDefinition Height="*" />
     </Grid.RowDefinitions>
 
-    <TextBlock
-        Margin="24,16"
-        Style="{StaticResource TitleTextBlockStyle}"
-        Text="Inbox" />
+    <Grid Margin="24,16,24,8" ColumnSpacing="16">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="Auto" />
+        <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="Auto" />
+      </Grid.ColumnDefinitions>
+      <TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="Inbox" />
+      <!-- Item order must match the InboxFilter enum values. -->
+      <SelectorBar
+          Grid.Column="1"
+          VerticalAlignment="Bottom"
+          SelectionChanged="OnFilterSelectionChanged">
+        <SelectorBarItem IsSelected="True" Text="Unread" />
+        <SelectorBarItem Text="All" />
+        <SelectorBarItem Text="Participating" />
+      </SelectorBar>
+    </Grid>
 
     <ListView
         x:Name="List"

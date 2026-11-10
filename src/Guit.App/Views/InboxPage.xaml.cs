@@ -1,3 +1,4 @@
+using Guit.Core.Models;
 using Guit.Core.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Xaml.Controls;
@@ -31,6 +32,15 @@ public sealed partial class InboxPage : Page
         if (args.ItemIndex >= ViewModel.Items.Count - 10)
         {
             ViewModel.LoadMoreCommand.Execute(null);
+        }
+    }
+
+    private void OnFilterSelectionChanged(SelectorBar sender, SelectorBarSelectionChangedEventArgs args)
+    {
+        int index = sender.Items.IndexOf(sender.SelectedItem);
+        if (index >= 0)
+        {
+            ViewModel.Filter = (InboxFilter)index;
         }
     }
 }

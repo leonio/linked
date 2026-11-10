@@ -38,7 +38,7 @@ one layer, one or two files plus tests, a worked example to copy.
 - [x] 2.4 Navigation service (`INavigator`, `Route`)
 - [x] 2.5 `InboxPage`: virtualised list with an item template
 - [x] 2.6 Paging: load more when the list nears its end
-- [ ] 2.7 Filters: Unread / All / Participating
+- [x] 2.7 Filters: Unread / All / Participating
 - [ ] 2.8 Item actions: mark as read, mark as done
 - [ ] 2.9 Refresh: button, F5, and a background poll
 - [ ] 2.10 Open a notification (`SubjectLink` parser; conversation or browser)
