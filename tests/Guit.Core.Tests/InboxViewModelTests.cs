@@ -185,7 +185,7 @@ public sealed class InboxViewModelTests
     [Test]
     public async Task MarkAsRead_keeps_the_row_when_showing_all()
     {
-        FakeNotificationsApi api = new([], Sample.Threads(2));
+        FakeNotificationsApi api = new(Sample.Threads(2));
         InboxViewModel viewModel = Create(api);
         viewModel.Filter = InboxFilter.All;
 
