@@ -9,6 +9,7 @@
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto" />
       <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
     </Grid.RowDefinitions>
 
     <Grid Margin="16,16,24,8" ColumnSpacing="12">
@@ -127,5 +128,32 @@
         IsOpen="{x:Bind xaml:Bind.IsNotEmpty(ViewModel.ErrorMessage), Mode=OneWay}"
         Message="{x:Bind ViewModel.ErrorMessage, Mode=OneWay}"
         Severity="Error" />
+
+    <Grid
+        Grid.Row="2"
+        Margin="24,8,24,16"
+        ColumnSpacing="8">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="Auto" />
+      </Grid.ColumnDefinitions>
+      <TextBox
+          MaxHeight="160"
+          AcceptsReturn="True"
+          PlaceholderText="Write a comment"
+          Text="{x:Bind ViewModel.Draft, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+          TextWrapping="Wrap" />
+      <Button
+          Grid.Column="1"
+          VerticalAlignment="Bottom"
+          Command="{x:Bind ViewModel.SendCommand}"
+          Content="Comment"
+          Style="{StaticResource AccentButtonStyle}"
+          ToolTipService.ToolTip="Comment (Ctrl+Enter)">
+        <Button.KeyboardAccelerators>
+          <KeyboardAccelerator Key="Enter" Modifiers="Control" />
+        </Button.KeyboardAccelerators>
+      </Button>
+    </Grid>
   </Grid>
 </Page>

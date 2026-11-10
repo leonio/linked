@@ -2,6 +2,7 @@ using Guit.Core.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Navigation;
+using System.Collections.Specialized;
 
 namespace Guit.App.Views;
 
@@ -12,6 +13,7 @@ public sealed partial class ConversationPage : Page
     {
         ViewModel = App.Services.GetRequiredService<ConversationViewModel>();
         InitializeComponent();
+        ViewModel.Comments.CollectionChanged += OnCommentsChanged;
     }
 
     public ConversationViewModel ViewModel { get; }
@@ -32,6 +34,15 @@ public sealed partial class ConversationPage : Page
         if (args.ItemIndex >= ViewModel.Comments.Count - 10)
         {
             ViewModel.LoadMoreCommand.Execute(null);
+        }
+    }
+
+    private void OnCommentsChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        // Bring the member's own new comment into view. Pages loaded while scrolling must not move the list.
+        if (e.Action == NotifyCollectionChangedAction.Add && ViewModel.IsSending && ViewModel.Comments.Count > 0)
+        {
+            List.ScrollIntoView(ViewModel.Comments[^1]);
         }
     }
 }
