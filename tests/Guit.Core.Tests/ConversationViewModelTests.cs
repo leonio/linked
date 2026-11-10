@@ -1,5 +1,6 @@
 using System.Net;
 using Guit.Api.Reactions;
+using Guit.Core.Text;
 using Guit.Core.ViewModels;
 
 namespace Guit.Core.Tests;
@@ -31,6 +32,7 @@ public sealed class ConversationViewModelTests
         await Assert.That(viewModel.Comments.Count).IsEqualTo(3);
         await Assert.That(viewModel.Comments[0].IsOpeningPost).IsTrue();
         await Assert.That(viewModel.Comments[0].Body).IsEqualTo("Please review");
+        await Assert.That(viewModel.Comments[0].Content.Blocks[0].Inlines[1]).IsEqualTo(new RichInline("review", RichStyles.Bold));
         await Assert.That(viewModel.Comments[1].Body).IsEqualTo("First reply");
         await Assert.That(viewModel.Comments[1].Association).IsEqualTo("member");
         await Assert.That(viewModel.Comments[1].Posted).IsEqualTo("3h");

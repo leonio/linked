@@ -15,7 +15,7 @@ public sealed partial class CommentItem : ObservableObject
 
     private readonly int[] _reactionCounts = new int[8];
 
-    private CommentItem(long id, bool isOpeningPost, GitHubUser? user, string? body, string? association, ReactionRollup? reactions, DateTimeOffset createdAt, DateTimeOffset now)
+    private CommentItem(long id, bool isOpeningPost, GitHubUser? user, string? body, string? bodyHtml, string? association, ReactionRollup? reactions, DateTimeOffset createdAt, DateTimeOffset now)
     {
         if (reactions is not null)
         {
@@ -30,6 +30,9 @@ public sealed partial class CommentItem : ObservableObject
         Author = user?.Login ?? "ghost";
         AvatarUrl = user is null ? string.Empty : NotificationItem.SmallAvatar(user.AvatarUrl);
         Body = body ?? string.Empty;
+
+        // Parse once, here, so the list only walks ready-made blocks while scrolling.
+        Content = string.IsNullOrEmpty(bodyHtml) ? RichDocument.FromPlainText(body) : HtmlRichText.Parse(bodyHtml);
         Association = association is null or "NONE" ? null : association.ToLowerInvariant().Replace('_', ' ');
         Posted = RelativeTime.Format(createdAt, now);
     }
@@ -43,7 +46,11 @@ public sealed partial class CommentItem : ObservableObject
 
     public string AvatarUrl { get; }
 
+    /// <summary>The post as plain text.</summary>
     public string Body { get; }
+
+    /// <summary>The post with its formatting, ready to draw.</summary>
+    public RichDocument Content { get; }
 
     public string Posted { get; }
 
@@ -94,12 +101,12 @@ public sealed partial class CommentItem : ObservableObject
     public static CommentItem From(IssueComment comment, DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(comment);
-        return new CommentItem(comment.Id, false, comment.User, comment.BodyText, comment.AuthorAssociation, comment.Reactions, comment.CreatedAt, now);
+        return new CommentItem(comment.Id, false, comment.User, comment.BodyText, comment.BodyHtml, comment.AuthorAssociation, comment.Reactions, comment.CreatedAt, now);
     }
 
     public static CommentItem FromIssue(Issue issue, DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(issue);
-        return new CommentItem(issue.Id, true, issue.User, issue.BodyText, null, issue.Reactions, issue.CreatedAt, now);
+        return new CommentItem(issue.Id, true, issue.User, issue.BodyText, issue.BodyHtml, null, issue.Reactions, issue.CreatedAt, now);
     }
 }

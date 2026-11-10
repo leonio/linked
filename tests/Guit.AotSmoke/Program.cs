@@ -59,6 +59,8 @@ PullRequestsViewModel pullRequests = provider.GetRequiredService<PullRequestsVie
 await pullRequests.LoadCommand.ExecuteAsync(null);
 Check(pullRequests.Items is [{ Reference: "octocat/hello #7", Argument: "octocat/hello!7", IsDraft: false }], "pull requests view model");
 
+Check(conversation.Comments[0].Content.Blocks is [{ Inlines: [{ Text: "Please " }, { Text: "review", Style: Guit.Core.Text.RichStyles.Bold }] }], "rich text from body_html");
+
 InboxViewModel inbox = provider.GetRequiredService<InboxViewModel>();
 await inbox.LoadCommand.ExecuteAsync(null);
 Check(inbox.Items is [{ Title: "Fix it", Repository: "octocat/hello", IsUnread: true }], "inbox view model");
