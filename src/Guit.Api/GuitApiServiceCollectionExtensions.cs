@@ -2,6 +2,7 @@ using Guit.Api.Auth;
 using Guit.Api.Http;
 using Guit.Api.Issues;
 using Guit.Api.Notifications;
+using Guit.Api.Reactions;
 using Guit.Api.Users;
 using Microsoft.Extensions.DependencyInjection;
 using Refit;
@@ -30,6 +31,7 @@ public static class GuitApiServiceCollectionExtensions
         // One line per authenticated API interface. Keep sorted.
         services.AddGitHubApi<IIssuesApi>(primaryHandler);
         services.AddGitHubApi<INotificationsApi>(primaryHandler);
+        services.AddGitHubApi<IReactionsApi>(primaryHandler);
         services.AddGitHubApi<IUsersApi>(primaryHandler);
 
         return services;

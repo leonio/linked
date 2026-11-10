@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 using Guit.Api.Auth;
 using Guit.Api.Issues;
 using Guit.Api.Notifications;
+using Guit.Api.Reactions;
 using Guit.Api.Users;
 
 namespace Guit.Api;
@@ -27,6 +28,8 @@ namespace Guit.Api;
 [JsonSerializable(typeof(IssueComment[]))]
 // Notifications
 [JsonSerializable(typeof(NotificationThread[]))]
+// Reactions
+[JsonSerializable(typeof(CreateReactionRequest))]
 // Users
 [JsonSerializable(typeof(GitHubUser))]
 public sealed partial class GitHubJsonContext : JsonSerializerContext;

@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using Guit.Api.Issues;
 using Guit.Api.Notifications;
+using Guit.Api.Reactions;
 using Guit.Api.Users;
 using Guit.Core;
 using Guit.Core.Services;
@@ -46,6 +47,8 @@ Check(posted is { Id: 12, BodyText: "Thanks" }, "issues api: create comment");
 ConversationViewModel conversation = provider.GetRequiredService<ConversationViewModel>();
 await conversation.LoadCommand.ExecuteAsync("octocat/hello!7");
 Check(conversation is { Title: "Fix it", IsPullRequest: true, Comments: [{ IsOpeningPost: true, Author: "octocat" }, { Author: "ghost", Body: "Looks good" }] }, "conversation view model");
+await provider.GetRequiredService<IReactionsApi>().CreateForIssueCommentAsync("octocat", "hello", 11, new CreateReactionRequest(ReactionContent.Heart), CancellationToken.None);
+Check(true, "reactions api: create");
 
 InboxViewModel inbox = provider.GetRequiredService<InboxViewModel>();
 await inbox.LoadCommand.ExecuteAsync(null);
@@ -137,6 +140,7 @@ internal sealed class CannedHandler : HttpMessageHandler
             "/repos/octocat/hello/issues/7/comments" when authorized && request.Method == HttpMethod.Get => """[{"id":11,"created_at":"2026-01-02T00:00:00Z","html_url":"https://github.com/octocat/hello/pull/7#issuecomment-11","user":null,"body_text":"Looks good","body_html":"<p>Looks good</p>","author_association":"MEMBER"}]""",
             "/repos/octocat/hello/issues/7/comments" when authorized && request.Method == HttpMethod.Post && ReadBody(request) == """{"body":"Thanks"}"""
                 => """{"id":12,"created_at":"2026-01-03T00:00:00Z","html_url":"https://github.com/octocat/hello/pull/7#issuecomment-12","user":{"login":"octocat","id":583231,"avatar_url":"https://avatars/1","html_url":"https://github.com/octocat"},"body_text":"Thanks","body_html":"<p>Thanks</p>"}""",
+            "/repos/octocat/hello/issues/comments/11/reactions" when authorized && ReadBody(request) == """{"content":"heart"}""" => """{"id":1,"content":"heart"}""",
             "/notifications/threads/1" when authorized => string.Empty,
             _ => null,
         };
