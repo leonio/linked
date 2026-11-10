@@ -30,10 +30,13 @@ internal sealed class RecordingHandler(string replyJson) : HttpMessageHandler
 
     public string? Body { get; private set; }
 
+    public string? Accept { get; private set; }
+
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
         Method = request.Method;
         Path = request.RequestUri?.PathAndQuery;
+        Accept = request.Headers.Accept.ToString();
         Body = request.Content is null ? null : await request.Content.ReadAsStringAsync(cancellationToken);
         return new HttpResponseMessage(HttpStatusCode.OK)
         {

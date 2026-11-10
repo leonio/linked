@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Guit.Api.Auth;
+using Guit.Api.Issues;
 using Guit.Api.Notifications;
 using Guit.Api.Users;
 
@@ -19,6 +20,9 @@ namespace Guit.Api;
 // Auth
 [JsonSerializable(typeof(DeviceCode))]
 [JsonSerializable(typeof(DeviceTokenResponse))]
+// Issues
+[JsonSerializable(typeof(Issue))]
+[JsonSerializable(typeof(IssueComment[]))]
 // Notifications
 [JsonSerializable(typeof(NotificationThread[]))]
 // Users

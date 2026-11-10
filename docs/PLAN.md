@@ -45,7 +45,7 @@ one layer, one or two files plus tests, a worked example to copy.
 
 ## Phase 3 - Conversations, the messaging ([cards](tasks/phase-3-conversations.md))
 
-- [ ] 3.1 Issues API: get issue, list comments
+- [x] 3.1 Issues API: get issue, list comments
 - [ ] 3.2 Issues API: create comment
 - [ ] 3.3 `ConversationViewModel`: issue + comments, paging
 - [ ] 3.4 `ConversationPage`: header, comment list
