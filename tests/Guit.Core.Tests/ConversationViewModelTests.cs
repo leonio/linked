@@ -8,8 +8,13 @@ public sealed class ConversationViewModelTests
 {
     private static readonly FixedTime Time = new(Sample.Now);
 
-    private static ConversationViewModel Create(FakeIssuesApi api, FakeNavigator? navigator = null, FakeLauncher? launcher = null, FakeReactionsApi? reactions = null)
-        => new(api, reactions ?? new FakeReactionsApi(), navigator ?? new FakeNavigator(), launcher ?? new FakeLauncher(), Time);
+    private static ConversationViewModel Create(
+        FakeIssuesApi api,
+        FakeNavigator? navigator = null,
+        FakeLauncher? launcher = null,
+        FakeReactionsApi? reactions = null,
+        FakePullsApi? pulls = null)
+        => new(api, pulls ?? new FakePullsApi(Sample.Pull()), reactions ?? new FakeReactionsApi(), navigator ?? new FakeNavigator(), launcher ?? new FakeLauncher(), Time);
 
     [Test]
     public async Task Load_fills_the_header_and_lists_the_opening_post_first()
@@ -193,5 +198,66 @@ public sealed class ConversationViewModelTests
 
         await Assert.That(viewModel.Comments[1].ReactionSummary).IsEqualTo("\U0001F44D 2");
         await Assert.That(viewModel.ErrorMessage).IsNotNull();
+    }
+
+    [Test]
+    [Arguments("open", false, false, "open")]
+    [Arguments("open", false, true, "draft")]
+    [Arguments("closed", false, true, "closed")]
+    [Arguments("closed", true, false, "merged")]
+    public async Task A_pull_request_refines_the_state(string state, bool merged, bool draft, string expected)
+    {
+        ConversationViewModel viewModel = Create(new FakeIssuesApi(Sample.Issue(state: state)), pulls: new FakePullsApi(Sample.Pull(state, merged, draft)));
+
+        await viewModel.LoadCommand.ExecuteAsync("octocat/hello!7");
+
+        await Assert.That(viewModel.State).IsEqualTo(expected);
+    }
+
+    [Test]
+    public async Task A_pull_request_shows_branches_and_diff_size()
+    {
+        ConversationViewModel viewModel = Create(new FakeIssuesApi(Sample.Issue()));
+
+        await viewModel.LoadCommand.ExecuteAsync("octocat/hello!7");
+
+        await Assert.That(viewModel.Branches).IsEqualTo("feature \u2192 main");
+        await Assert.That(viewModel.DiffSummary).IsEqualTo("+120 \u22128 in 5 files");
+        await Assert.That(viewModel.HasPullDetails).IsTrue();
+    }
+
+    [Test]
+    public async Task A_pull_request_from_a_fork_names_the_source_owner()
+    {
+        ConversationViewModel viewModel = Create(new FakeIssuesApi(Sample.Issue()), pulls: new FakePullsApi(Sample.Pull(headLabel: "contributor:feature")));
+
+        await viewModel.LoadCommand.ExecuteAsync("octocat/hello!7");
+
+        await Assert.That(viewModel.Branches).IsEqualTo("contributor:feature \u2192 main");
+    }
+
+    [Test]
+    public async Task A_failed_pull_request_lookup_still_shows_the_conversation()
+    {
+        ConversationViewModel viewModel = Create(new FakeIssuesApi(Sample.Issue(), [Sample.Comment(11)]), pulls: new FakePullsApi(null));
+
+        await viewModel.LoadCommand.ExecuteAsync("octocat/hello!7");
+
+        await Assert.That(viewModel.ErrorMessage).IsNull();
+        await Assert.That(viewModel.Comments.Count).IsEqualTo(2);
+        await Assert.That(viewModel.State).IsEqualTo("open");
+        await Assert.That(viewModel.HasPullDetails).IsFalse();
+    }
+
+    [Test]
+    public async Task A_plain_issue_does_not_ask_for_pull_request_details()
+    {
+        FakePullsApi pulls = new(Sample.Pull());
+        ConversationViewModel viewModel = Create(new FakeIssuesApi(Sample.Issue(isPullRequest: false)), pulls: pulls);
+
+        await viewModel.LoadCommand.ExecuteAsync("octocat/hello#7");
+
+        await Assert.That(pulls.Calls).IsEqualTo(0);
+        await Assert.That(viewModel.IsPullRequest).IsFalse();
     }
 }

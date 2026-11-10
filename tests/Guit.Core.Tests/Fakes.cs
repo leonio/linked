@@ -3,6 +3,7 @@ using Guit.Api.Auth;
 using Guit.Api.Http;
 using Guit.Api.Issues;
 using Guit.Api.Notifications;
+using Guit.Api.Pulls;
 using Guit.Api.Reactions;
 using Guit.Api.Users;
 using Guit.Core.Services;
@@ -53,6 +54,9 @@ internal static class Sample
             "Please review",
             "<p>Please <strong>review</strong></p>",
             PullRequest: isPullRequest ? new IssuePullRequestRef("https://github.com/octocat/hello/pull/7") : null);
+
+    public static PullRequest Pull(string state = "open", bool merged = false, bool draft = false, string headLabel = "octocat:feature")
+        => new(7, state, merged, 120, 8, 5, new PullBranch("feature", headLabel), new PullBranch("main", "octocat:main"), draft);
 
     public static ReactionRollup Reactions(int plusOne = 0, int heart = 0, int rocket = 0)
         => new(plusOne + heart + rocket, plusOne, 0, 0, 0, heart, 0, 0, rocket);
@@ -307,5 +311,18 @@ internal sealed class FakeReactionsApi : IReactionsApi
 
         FailNextWith = null;
         return Task.FromException(Failure.Status(status));
+    }
+}
+
+internal sealed class FakePullsApi(PullRequest? pull = null) : IPullsApi
+{
+    public int Calls { get; private set; }
+
+    public Task<PullRequest> GetAsync(string owner, string repo, int pullNumber, CancellationToken cancellationToken)
+    {
+        Calls++;
+        return pull is null
+            ? Task.FromException<PullRequest>(Failure.Status(HttpStatusCode.BadGateway))
+            : Task.FromResult(pull);
     }
 }

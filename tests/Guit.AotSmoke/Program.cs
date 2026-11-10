@@ -47,7 +47,7 @@ Check(posted is { Id: 12, BodyText: "Thanks" }, "issues api: create comment");
 
 ConversationViewModel conversation = provider.GetRequiredService<ConversationViewModel>();
 await conversation.LoadCommand.ExecuteAsync("octocat/hello!7");
-Check(conversation is { Title: "Fix it", IsPullRequest: true, Comments: [{ IsOpeningPost: true, Author: "octocat" }, { Author: "ghost", Body: "Looks good" }] }, "conversation view model");
+Check(conversation is { Title: "Fix it", IsPullRequest: true, HasPullDetails: true, Comments: [{ IsOpeningPost: true, Author: "octocat" }, { Author: "ghost", Body: "Looks good" }] }, "conversation view model");
 await provider.GetRequiredService<IReactionsApi>().CreateForIssueCommentAsync("octocat", "hello", 11, new CreateReactionRequest(ReactionContent.Heart), CancellationToken.None);
 Check(true, "reactions api: create");
 PullRequest pull = await provider.GetRequiredService<IPullsApi>().GetAsync("octocat", "hello", 7, CancellationToken.None);

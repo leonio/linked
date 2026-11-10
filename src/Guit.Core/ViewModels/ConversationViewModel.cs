@@ -1,7 +1,9 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using System.Globalization;
 using Guit.Api.Issues;
+using Guit.Api.Pulls;
 using Guit.Api.Reactions;
 using Guit.Core.Models;
 using Guit.Core.Services;
@@ -12,6 +14,7 @@ namespace Guit.Core.ViewModels;
 /// <summary>One issue or pull request: a header, the opening post, and the comments oldest first.</summary>
 public sealed partial class ConversationViewModel(
     IIssuesApi issues,
+    IPullsApi pulls,
     IReactionsApi reactions,
     INavigator navigator,
     ILauncher launcher,
@@ -31,9 +34,20 @@ public sealed partial class ConversationViewModel(
     [ObservableProperty]
     public partial string Subtitle { get; private set; } = string.Empty;
 
-    /// <summary>"open" or "closed" (pull requests refine this later).</summary>
+    /// <summary>"open" or "closed"; for pull requests also "merged" or "draft".</summary>
     [ObservableProperty]
     public partial string State { get; private set; } = string.Empty;
+
+    /// <summary>"feature → main" for a pull request; empty otherwise or when the details could not be loaded.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasPullDetails))]
+    public partial string Branches { get; private set; } = string.Empty;
+
+    /// <summary>"+120 −8 in 5 files" for a pull request.</summary>
+    [ObservableProperty]
+    public partial string DiffSummary { get; private set; } = string.Empty;
+
+    public bool HasPullDetails => Branches.Length > 0;
 
     [ObservableProperty]
     public partial bool IsPullRequest { get; private set; }
@@ -81,13 +95,17 @@ public sealed partial class ConversationViewModel(
             // The two requests do not depend on each other, so send them together.
             Task<Issue> issueTask = issues.GetAsync(_link.Owner, _link.Repo, _link.Number, cancellationToken);
             Task<IssueComment[]> commentsTask = issues.ListCommentsAsync(_link.Owner, _link.Repo, _link.Number, 1, PageSize, cancellationToken);
-            await Task.WhenAll(issueTask, commentsTask);
+            Task<PullRequest?> pullTask = _link.IsPullRequest ? TryGetPullAsync(cancellationToken) : Task.FromResult<PullRequest?>(null);
+            await Task.WhenAll(issueTask, commentsTask, pullTask);
             Issue issue = await issueTask;
             IssueComment[] page = await commentsTask;
+            PullRequest? pull = await pullTask;
 
             Title = issue.Title;
-            State = issue.State;
+            State = DescribeState(issue, pull);
             IsPullRequest = issue.PullRequest is not null;
+            Branches = pull is null ? string.Empty : DescribeBranches(pull);
+            DiffSummary = pull is null ? string.Empty : DescribeDiff(pull);
             Comments.Clear();
             Comments.Add(CommentItem.FromIssue(issue, time.GetUtcNow()));
             Append(page);
@@ -195,6 +213,45 @@ public sealed partial class ConversationViewModel(
     [RelayCommand]
     private Task OpenInBrowserAsync()
         => _link.Owner is null ? Task.CompletedTask : launcher.OpenAsync(_link.ToWebUri());
+
+    // The header extras are optional: a failure here must not cost the member the whole conversation.
+    private async Task<PullRequest?> TryGetPullAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await pulls.GetAsync(_link.Owner, _link.Repo, _link.Number, cancellationToken);
+        }
+        catch (ApiExceptionBase)
+        {
+            return null;
+        }
+    }
+
+    private static string DescribeState(Issue issue, PullRequest? pull) => pull switch
+    {
+        { Merged: true } => "merged",
+        { State: "closed" } => "closed",
+        { Draft: true } => "draft",
+        _ => issue.State,
+    };
+
+    private static string DescribeBranches(PullRequest pull)
+    {
+        // Across forks the bare branch name is ambiguous, so show "owner:branch" for the source.
+        bool sameRepository = OwnerOf(pull.Head.Label) == OwnerOf(pull.Base.Label);
+        return $"{(sameRepository ? pull.Head.Ref : pull.Head.Label)} \u2192 {pull.Base.Ref}";
+    }
+
+    private static string OwnerOf(string label)
+    {
+        int colon = label.IndexOf(':', StringComparison.Ordinal);
+        return colon < 0 ? string.Empty : label[..colon];
+    }
+
+    private static string DescribeDiff(PullRequest pull)
+        => string.Create(
+            CultureInfo.InvariantCulture,
+            $"+{pull.Additions} \u2212{pull.Deletions} in {pull.ChangedFiles} {(pull.ChangedFiles == 1 ? "file" : "files")}");
 
     private void Append(IssueComment[] page)
     {
