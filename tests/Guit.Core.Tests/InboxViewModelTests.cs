@@ -1,4 +1,5 @@
 using System.Net;
+using Guit.Core.Models;
 using Guit.Core.ViewModels;
 
 namespace Guit.Core.Tests;
@@ -104,5 +105,46 @@ public sealed class InboxViewModelTests
         await viewModel.LoadMoreCommand.ExecuteAsync(null);
         await Assert.That(api.ListCalls[2].Page).IsEqualTo(2);
         await Assert.That(viewModel.Items.Count).IsEqualTo(51);
+    }
+
+    [Test]
+    [Arguments(InboxFilter.Unread, false, false)]
+    [Arguments(InboxFilter.All, true, false)]
+    [Arguments(InboxFilter.Participating, false, true)]
+    public async Task Each_filter_sends_its_query(InboxFilter filter, bool all, bool participating)
+    {
+        FakeNotificationsApi api = new(Sample.Threads(50), Sample.Threads(1, firstId: 51));
+        InboxViewModel viewModel = new(api, Time);
+
+        // Setting a different filter loads by itself; the default filter needs an explicit load.
+        if (filter == InboxFilter.Unread)
+        {
+            await viewModel.LoadCommand.ExecuteAsync(null);
+        }
+        else
+        {
+            viewModel.Filter = filter;
+        }
+
+        await viewModel.LoadMoreCommand.ExecuteAsync(null);
+
+        await Assert.That(api.ListCalls[^2]).IsEqualTo((all, participating, 1, 50));
+        await Assert.That(api.ListCalls[^1]).IsEqualTo((all, participating, 2, 50));
+    }
+
+    [Test]
+    public async Task Changing_the_filter_replaces_the_items_and_restarts_paging()
+    {
+        FakeNotificationsApi api = new(Sample.Threads(50), Sample.Threads(50, firstId: 51), [Sample.Thread("900", "Read one", unread: false)]);
+        InboxViewModel viewModel = new(api, Time);
+        await viewModel.LoadCommand.ExecuteAsync(null);
+        await viewModel.LoadMoreCommand.ExecuteAsync(null);
+
+        viewModel.Filter = InboxFilter.All;
+
+        await Assert.That(viewModel.Items.Count).IsEqualTo(1);
+        await Assert.That(viewModel.Items[0].Id).IsEqualTo("900");
+        await Assert.That(api.ListCalls[^1]).IsEqualTo((true, false, 1, 50));
+        await Assert.That(viewModel.HasMore).IsFalse();
     }
 }

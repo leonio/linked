@@ -25,6 +25,10 @@ public sealed partial class InboxViewModel(INotificationsApi notifications, Time
     [NotifyPropertyChangedFor(nameof(IsEmpty))]
     public partial string? ErrorMessage { get; private set; }
 
+    /// <summary>Changing the filter reloads the list from the first page.</summary>
+    [ObservableProperty]
+    public partial InboxFilter Filter { get; set; }
+
     /// <summary>True while the last page that arrived was full, so there may be another.</summary>
     [ObservableProperty]
     public partial bool HasMore { get; private set; }
@@ -43,7 +47,7 @@ public sealed partial class InboxViewModel(INotificationsApi notifications, Time
         ErrorMessage = null;
         try
         {
-            NotificationThread[] page = await notifications.ListAsync(all: false, participating: false, page: 1, PageSize, cancellationToken);
+            NotificationThread[] page = await ListPageAsync(1, cancellationToken);
             Items.Clear();
             Append(page);
             _page = 1;
@@ -76,7 +80,7 @@ public sealed partial class InboxViewModel(INotificationsApi notifications, Time
         ErrorMessage = null;
         try
         {
-            NotificationThread[] page = await notifications.ListAsync(all: false, participating: false, _page + 1, PageSize, cancellationToken);
+            NotificationThread[] page = await ListPageAsync(_page + 1, cancellationToken);
             Append(page);
             _page++;
             HasMore = page.Length == PageSize;
@@ -93,6 +97,16 @@ public sealed partial class InboxViewModel(INotificationsApi notifications, Time
             IsLoadingMore = false;
         }
     }
+
+    partial void OnFilterChanged(InboxFilter value) => LoadCommand.Execute(null);
+
+    private Task<NotificationThread[]> ListPageAsync(int page, CancellationToken cancellationToken)
+        => notifications.ListAsync(
+            all: Filter == InboxFilter.All,
+            participating: Filter == InboxFilter.Participating,
+            page,
+            PageSize,
+            cancellationToken);
 
     private void Append(NotificationThread[] page)
     {
