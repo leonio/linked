@@ -34,6 +34,7 @@ public partial class App : Application
         services.AddSingleton(new GitHubOptions(AppConfig.GitHubClientId));
         services.AddSingleton<ITokenStore, PasswordVaultTokenStore>();
         services.AddSingleton<ILauncher, Launcher>();
+        services.AddSingleton<IUiDispatcher>(new UiDispatcher());
         services.AddSingleton<Navigator>();
         services.AddSingleton<INavigator>(static provider => provider.GetRequiredService<Navigator>());
         services.AddGuitCore();

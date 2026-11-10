@@ -21,15 +21,21 @@ public interface ILauncher
     void CopyToClipboard(string text);
 }
 
+/// <summary>Runs work on the UI thread. Implemented by the app; tests run the action immediately.</summary>
+public interface IUiDispatcher
+{
+    void Post(Action action);
+}
+
 /// <summary>App-level settings supplied by the app at start-up.</summary>
 /// <param name="ClientId">The OAuth App client id. Public, not a secret.</param>
 /// <param name="Scopes">Space-separated OAuth scopes.</param>
 public sealed record GitHubOptions(string ClientId, string Scopes = "notifications repo read:user");
 
 /// <summary>The signed-in state. Singleton. Raises <see cref="Changed"/> on the thread that called SignIn/SignOut.</summary>
-public sealed class Session(ITokenStore store) : IAccessTokenProvider
+public sealed class Session(ITokenStore store, IUiDispatcher dispatcher) : IAccessTokenProvider, IUnauthorizedHandler
 {
-    private string? _token = store.Load();
+    private volatile string? _token = store.Load();
 
     public event EventHandler? Changed;
 
@@ -43,6 +49,26 @@ public sealed class Session(ITokenStore store) : IAccessTokenProvider
         store.Save(token);
         _token = token;
         Changed?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>
+    /// GitHub rejected the token. Arrives on a thread-pool thread, so the sign-out (which updates
+    /// view models) is posted to the UI thread. Repeated calls sign out once.
+    /// </summary>
+    public void OnUnauthorized()
+    {
+        if (!IsSignedIn)
+        {
+            return;
+        }
+
+        dispatcher.Post(() =>
+        {
+            if (IsSignedIn)
+            {
+                SignOut();
+            }
+        });
     }
 
     public void SignOut()

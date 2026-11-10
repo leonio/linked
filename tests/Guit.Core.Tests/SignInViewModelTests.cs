@@ -12,7 +12,7 @@ public sealed class SignInViewModelTests
     public async Task Approval_stores_the_token_and_opens_the_browser_with_the_code_on_the_clipboard()
     {
         FakeTokenStore store = new();
-        Session session = new(store);
+        Session session = new(store, new ImmediateDispatcher());
         FakeLauncher launcher = new();
         SignInViewModel viewModel = new(
             new FakeDeviceFlowApi(new DeviceTokenResponse(Error: "authorization_pending"), new DeviceTokenResponse(AccessToken: "gho_abc")),
@@ -31,7 +31,7 @@ public sealed class SignInViewModelTests
     [Test]
     public async Task Denial_leaves_the_session_signed_out_and_explains_why()
     {
-        Session session = new(new FakeTokenStore());
+        Session session = new(new FakeTokenStore(), new ImmediateDispatcher());
         SignInViewModel viewModel = new(
             new FakeDeviceFlowApi(new DeviceTokenResponse(Error: "access_denied")),
             session, Options, new FakeLauncher(), TimeProvider.System);

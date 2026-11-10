@@ -14,6 +14,7 @@ using Microsoft.Extensions.DependencyInjection;
 ServiceCollection services = new();
 services.AddSingleton<ITokenStore, MemoryTokenStore>();
 services.AddSingleton<ILauncher, NullLauncher>();
+services.AddSingleton<IUiDispatcher, InlineDispatcher>();
 services.AddSingleton(new GitHubOptions("smoke-client"));
 services.AddGuitCore(static () => new CannedHandler());
 
@@ -40,6 +41,17 @@ ShellViewModel shell = provider.GetRequiredService<ShellViewModel>();
 await shell.LoadUserCommand.ExecuteAsync(null);
 Check(shell is { IsSignedIn: true, Login: "octocat" }, "shell view model");
 
+// Last, because it signs the session out: a 401 from the API must end the session.
+try
+{
+    await notifications.MarkAsDoneAsync("revoked", CancellationToken.None);
+}
+catch (Refit.ApiException)
+{
+}
+
+Check(!provider.GetRequiredService<Session>().IsSignedIn && !shell.IsSignedIn, "401 signs out");
+
 Console.WriteLine("AOT smoke: all checks passed");
 return 0;
 
@@ -63,6 +75,11 @@ internal sealed class MemoryTokenStore : ITokenStore
     public void Save(string token) => _token = token;
 
     public void Clear() => _token = null;
+}
+
+internal sealed class InlineDispatcher : IUiDispatcher
+{
+    public void Post(Action action) => action();
 }
 
 internal sealed class NullLauncher : ILauncher
@@ -90,11 +107,16 @@ internal sealed class CannedHandler : HttpMessageHandler
             _ => null,
         };
 
+        if (request.RequestUri?.AbsolutePath == "/notifications/threads/revoked")
+        {
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.Unauthorized) { RequestMessage = request });
+        }
+
         HttpResponseMessage response = json is null
             ? new HttpResponseMessage(HttpStatusCode.NotFound)
             : json.Length == 0
             ? new HttpResponseMessage(HttpStatusCode.ResetContent)
-            : new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json, Encoding.UTF8, "application/json") };
+            : new HttpResponseMessage(HttpStatusCode.OK) { RequestMessage = request, Content = new StringContent(json, Encoding.UTF8, "application/json") };
         return Task.FromResult(response);
     }
 }

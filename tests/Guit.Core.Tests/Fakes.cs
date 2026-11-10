@@ -90,6 +90,11 @@ internal sealed class FakeLauncher : ILauncher
     public void CopyToClipboard(string text) => Clipboard = text;
 }
 
+internal sealed class ImmediateDispatcher : IUiDispatcher
+{
+    public void Post(Action action) => action();
+}
+
 internal sealed class FakeNavigator : INavigator
 {
     public List<(Route Route, string? Argument)> Navigations { get; } = [];

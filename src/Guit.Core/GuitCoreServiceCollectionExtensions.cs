@@ -11,7 +11,8 @@ public static class GuitCoreServiceCollectionExtensions
 {
     /// <summary>
     /// Registers the API clients, services and view models. The caller must register
-    /// <see cref="ITokenStore"/>, <see cref="ILauncher"/> and <see cref="GitHubOptions"/>.
+    /// <see cref="ITokenStore"/>, <see cref="ILauncher"/>, <see cref="IUiDispatcher"/>,
+    /// <see cref="INavigator"/> and <see cref="GitHubOptions"/>.
     /// </summary>
     public static IServiceCollection AddGuitCore(this IServiceCollection services, Func<HttpMessageHandler>? primaryHandler = null)
     {
@@ -19,6 +20,7 @@ public static class GuitCoreServiceCollectionExtensions
         services.TryAddSingleton(TimeProvider.System);
         services.AddSingleton<Session>();
         services.AddSingleton<IAccessTokenProvider>(static provider => provider.GetRequiredService<Session>());
+        services.AddSingleton<IUnauthorizedHandler>(static provider => provider.GetRequiredService<Session>());
 
         // View models. Shell-level ones are singletons; page-level ones are transient. Keep sorted.
         services.AddTransient<InboxViewModel>();

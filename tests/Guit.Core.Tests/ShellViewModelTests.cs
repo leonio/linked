@@ -11,7 +11,7 @@ public sealed class ShellViewModelTests
     [Test]
     public async Task A_stored_token_starts_the_shell_signed_in()
     {
-        ShellViewModel viewModel = new(new Session(new FakeTokenStore("gho_abc")), new FakeUsersApi(Octocat));
+        ShellViewModel viewModel = new(new Session(new FakeTokenStore("gho_abc"), new ImmediateDispatcher()), new FakeUsersApi(Octocat));
 
         await viewModel.LoadUserCommand.ExecuteAsync(null);
 
@@ -22,7 +22,7 @@ public sealed class ShellViewModelTests
     [Test]
     public async Task Signing_in_and_out_updates_the_shell_and_raises_IsSignedOut()
     {
-        Session session = new(new FakeTokenStore());
+        Session session = new(new FakeTokenStore(), new ImmediateDispatcher());
         ShellViewModel viewModel = new(session, new FakeUsersApi(Octocat));
         List<string?> changed = [];
         viewModel.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
@@ -40,7 +40,7 @@ public sealed class ShellViewModelTests
     [Test]
     public async Task A_failed_user_request_does_not_sign_the_member_out()
     {
-        ShellViewModel viewModel = new(new Session(new FakeTokenStore("gho_abc")), new FakeUsersApi(null));
+        ShellViewModel viewModel = new(new Session(new FakeTokenStore("gho_abc"), new ImmediateDispatcher()), new FakeUsersApi(null));
 
         await viewModel.LoadUserCommand.ExecuteAsync(null);
 
