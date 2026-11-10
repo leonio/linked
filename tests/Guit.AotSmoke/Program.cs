@@ -55,6 +55,9 @@ PullRequest pull = await provider.GetRequiredService<IPullsApi>().GetAsync("octo
 Check(pull is { Merged: false, Additions: 120, Head.Ref: "feature", Base.Ref: "main" }, "pulls api: get");
 IssueSearchResult found = await provider.GetRequiredService<ISearchApi>().SearchIssuesAsync("is:open is:pr author:@me", "updated", "desc", 1, 50, CancellationToken.None);
 Check(found is { TotalCount: 1, Items: [{ Number: 7, RepositoryUrl: "https://api.github.com/repos/octocat/hello" }] }, "search api: issues");
+PullRequestsViewModel pullRequests = provider.GetRequiredService<PullRequestsViewModel>();
+await pullRequests.LoadCommand.ExecuteAsync(null);
+Check(pullRequests.Items is [{ Reference: "octocat/hello #7", Argument: "octocat/hello!7", IsDraft: false }], "pull requests view model");
 
 InboxViewModel inbox = provider.GetRequiredService<InboxViewModel>();
 await inbox.LoadCommand.ExecuteAsync(null);

@@ -5,6 +5,7 @@ using Guit.Api.Issues;
 using Guit.Api.Notifications;
 using Guit.Api.Pulls;
 using Guit.Api.Reactions;
+using Guit.Api.Search;
 using Guit.Api.Users;
 using Guit.Core.Services;
 using Refit;
@@ -57,6 +58,30 @@ internal static class Sample
 
     public static PullRequest Pull(string state = "open", bool merged = false, bool draft = false, string headLabel = "octocat:feature")
         => new(7, state, merged, 120, 8, 5, new PullBranch("feature", headLabel), new PullBranch("main", "octocat:main"), draft);
+
+    public static IssueSearchItem Found(int number, string title = "Fix it", bool draft = false, bool deletedUser = false)
+        => new(
+            1000 + number,
+            number,
+            title,
+            "open",
+            2,
+            Now.AddHours(-3),
+            $"https://github.com/octocat/hello/pull/{number}",
+            "https://api.github.com/repos/octocat/hello",
+            deletedUser ? null : Octocat,
+            draft);
+
+    public static IssueSearchItem[] FoundMany(int count, int firstNumber = 1)
+    {
+        IssueSearchItem[] items = new IssueSearchItem[count];
+        for (int i = 0; i < count; i++)
+        {
+            items[i] = Found(firstNumber + i);
+        }
+
+        return items;
+    }
 
     public static ReactionRollup Reactions(int plusOne = 0, int heart = 0, int rocket = 0)
         => new(plusOne + heart + rocket, plusOne, 0, 0, 0, heart, 0, 0, rocket);
@@ -324,5 +349,28 @@ internal sealed class FakePullsApi(PullRequest? pull = null) : IPullsApi
         return pull is null
             ? Task.FromException<PullRequest>(Failure.Status(HttpStatusCode.BadGateway))
             : Task.FromResult(pull);
+    }
+}
+
+/// <summary>Returns the queued result pages in order (an empty page once they run out) and records each query.</summary>
+internal sealed class FakeSearchApi(params IssueSearchItem[][] pages) : ISearchApi
+{
+    private readonly Queue<IssueSearchItem[]> _pages = new(pages);
+
+    public HttpStatusCode? FailNextWith { get; set; }
+
+    public List<(string Q, string Sort, string Order, int Page, int PerPage)> Calls { get; } = [];
+
+    public Task<IssueSearchResult> SearchIssuesAsync(string q, string sort, string order, int page, int perPage, CancellationToken cancellationToken)
+    {
+        Calls.Add((q, sort, order, page, perPage));
+        if (FailNextWith is { } status)
+        {
+            FailNextWith = null;
+            return Task.FromException<IssueSearchResult>(Failure.Status(status));
+        }
+
+        IssueSearchItem[] items = _pages.Count > 0 ? _pages.Dequeue() : [];
+        return Task.FromResult(new IssueSearchResult(items.Length, false, items));
     }
 }
