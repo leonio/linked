@@ -142,14 +142,33 @@ internal sealed class FakeNotificationsApi(params NotificationThread[][] pages) 
 
     public List<string> MarkedDone { get; } = [];
 
+    /// <summary>When set, the next ListAsync waits for this to complete before replying.</summary>
+    public TaskCompletionSource? HoldNextList { get; set; }
+
     public void Enqueue(NotificationThread[] page) => _pages.Enqueue(page);
 
     public Task<NotificationThread[]> ListAsync(bool all, bool participating, int page, int perPage, CancellationToken cancellationToken)
     {
         ListCalls.Add((all, participating, page, perPage));
-        return TakeFailure() is { } failure
-            ? Task.FromException<NotificationThread[]>(failure)
-            : Task.FromResult(_pages.Count > 0 ? _pages.Dequeue() : []);
+        if (TakeFailure() is { } failure)
+        {
+            return Task.FromException<NotificationThread[]>(failure);
+        }
+
+        NotificationThread[] reply = _pages.Count > 0 ? _pages.Dequeue() : [];
+        if (HoldNextList is not { } hold)
+        {
+            return Task.FromResult(reply);
+        }
+
+        HoldNextList = null;
+        return WaitThenReply(hold.Task, reply);
+    }
+
+    private static async Task<NotificationThread[]> WaitThenReply(Task gate, NotificationThread[] reply)
+    {
+        await gate;
+        return reply;
     }
 
     public Task MarkAsReadAsync(string threadId, CancellationToken cancellationToken)

@@ -147,4 +147,21 @@ public sealed class InboxViewModelTests
         await Assert.That(api.ListCalls[^1]).IsEqualTo((true, false, 1, 50));
         await Assert.That(viewModel.HasMore).IsFalse();
     }
+
+    [Test]
+    public async Task A_newer_load_discards_the_reply_of_an_older_one()
+    {
+        TaskCompletionSource slow = new();
+        FakeNotificationsApi api = new([Sample.Thread("1", "Stale unread")], [Sample.Thread("2", "Fresh all")]) { HoldNextList = slow };
+        InboxViewModel viewModel = new(api, Time);
+
+        Task first = viewModel.LoadCommand.ExecuteAsync(null);
+        viewModel.Filter = InboxFilter.All;
+        slow.SetResult();
+        await first;
+
+        await Assert.That(viewModel.Items.Count).IsEqualTo(1);
+        await Assert.That(viewModel.Items[0].Title).IsEqualTo("Fresh all");
+        await Assert.That(viewModel.IsLoading).IsFalse();
+    }
 }

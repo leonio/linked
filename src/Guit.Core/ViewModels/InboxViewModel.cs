@@ -14,6 +14,7 @@ public sealed partial class InboxViewModel(INotificationsApi notifications, Time
     private const int PageSize = 50;
 
     private int _page = 1;
+    private int _generation;
 
     public ObservableCollection<NotificationItem> Items { get; } = [];
 
@@ -39,15 +40,24 @@ public sealed partial class InboxViewModel(INotificationsApi notifications, Time
     /// <summary>True when a load finished without error and there is nothing to show.</summary>
     public bool IsEmpty => !IsLoading && ErrorMessage is null && Items.Count == 0;
 
-    /// <summary>Replaces the list with the first page.</summary>
-    [RelayCommand]
+    /// <summary>
+    /// Replaces the list with the first page. A newer load (for example after a filter change)
+    /// supersedes one that is still running: the older reply is discarded.
+    /// </summary>
+    [RelayCommand(AllowConcurrentExecutions = true)]
     private async Task LoadAsync(CancellationToken cancellationToken)
     {
+        int generation = ++_generation;
         IsLoading = true;
         ErrorMessage = null;
         try
         {
             NotificationThread[] page = await ListPageAsync(1, cancellationToken);
+            if (generation != _generation)
+            {
+                return;
+            }
+
             Items.Clear();
             Append(page);
             _page = 1;
@@ -58,12 +68,18 @@ public sealed partial class InboxViewModel(INotificationsApi notifications, Time
         }
         catch (ApiExceptionBase ex)
         {
-            ErrorMessage = ApiErrors.Describe(ex);
+            if (generation == _generation)
+            {
+                ErrorMessage = ApiErrors.Describe(ex);
+            }
         }
         finally
         {
-            IsLoading = false;
-            OnPropertyChanged(nameof(IsEmpty));
+            if (generation == _generation)
+            {
+                IsLoading = false;
+                OnPropertyChanged(nameof(IsEmpty));
+            }
         }
     }
 
@@ -76,11 +92,17 @@ public sealed partial class InboxViewModel(INotificationsApi notifications, Time
             return;
         }
 
+        int generation = _generation;
         IsLoadingMore = true;
         ErrorMessage = null;
         try
         {
             NotificationThread[] page = await ListPageAsync(_page + 1, cancellationToken);
+            if (generation != _generation)
+            {
+                return;
+            }
+
             Append(page);
             _page++;
             HasMore = page.Length == PageSize;
