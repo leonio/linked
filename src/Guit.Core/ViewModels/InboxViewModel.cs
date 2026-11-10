@@ -12,12 +12,16 @@ namespace Guit.Core.ViewModels;
 public sealed partial class InboxViewModel(
     INotificationsApi notifications,
     ILauncher launcher,
+    IUiDispatcher dispatcher,
     TimeProvider time) : ObservableObject
 {
     private const int PageSize = 50;
 
+    private static readonly TimeSpan PollPeriod = TimeSpan.FromSeconds(60);
+
     private int _page = 1;
     private int _generation;
+    private ITimer? _pollTimer;
 
     public ObservableCollection<NotificationItem> Items { get; } = [];
 
@@ -84,6 +88,79 @@ public sealed partial class InboxViewModel(
                 OnPropertyChanged(nameof(IsEmpty));
             }
         }
+    }
+
+    /// <summary>
+    /// Fetches the first page again and replaces the list only if something changed,
+    /// so an unchanged inbox keeps its rows and scroll position. Shows no spinner.
+    /// </summary>
+    [RelayCommand]
+    private async Task RefreshAsync(CancellationToken cancellationToken)
+    {
+        if (IsLoading || IsLoadingMore)
+        {
+            return;
+        }
+
+        int generation = _generation;
+        try
+        {
+            NotificationThread[] page = await ListPageAsync(1, cancellationToken);
+            if (generation != _generation || IsSameAsFirstPage(page))
+            {
+                return;
+            }
+
+            ErrorMessage = null;
+            Items.Clear();
+            Append(page);
+            _page = 1;
+            HasMore = page.Length == PageSize;
+            OnPropertyChanged(nameof(IsEmpty));
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (ApiExceptionBase)
+        {
+            // A background refresh that fails says nothing; the next one, or a manual load, will report it.
+        }
+    }
+
+    /// <summary>Starts refreshing in the background. Call when the page is shown.</summary>
+    public void StartPolling()
+        => _pollTimer ??= time.CreateTimer(
+            static state => ((InboxViewModel)state!).OnPollTick(),
+            this,
+            PollPeriod,
+            PollPeriod);
+
+    /// <summary>Stops the background refresh. Call when the page is left.</summary>
+    public void StopPolling()
+    {
+        _pollTimer?.Dispose();
+        _pollTimer = null;
+    }
+
+    // Timer callbacks arrive on a thread-pool thread; view model state belongs to the UI thread.
+    private void OnPollTick() => dispatcher.Post(() => RefreshCommand.Execute(null));
+
+    private bool IsSameAsFirstPage(NotificationThread[] page)
+    {
+        if (page.Length > Items.Count || (Items.Count <= PageSize && Items.Count != page.Length))
+        {
+            return false;
+        }
+
+        for (int i = 0; i < page.Length; i++)
+        {
+            if (Items[i].Id != page[i].Id || Items[i].IsUnread != page[i].Unread)
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /// <summary>Appends the next page. Does nothing when there is no more, or a load is already running.</summary>

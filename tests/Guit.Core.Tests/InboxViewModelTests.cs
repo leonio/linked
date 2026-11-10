@@ -9,7 +9,7 @@ public sealed class InboxViewModelTests
     private static readonly FixedTime Time = new(Sample.Now);
 
     private static InboxViewModel Create(FakeNotificationsApi api, FakeLauncher? launcher = null)
-        => new(api, launcher ?? new FakeLauncher(), Time);
+        => new(api, launcher ?? new FakeLauncher(), new ImmediateDispatcher(), Time);
 
     [Test]
     public async Task Load_fills_the_items_in_order()
@@ -264,5 +264,58 @@ public sealed class InboxViewModelTests
         await viewModel.OpenCommand.ExecuteAsync(viewModel.Items[0]);
 
         await Assert.That(launcher.Opened).IsEqualTo(new Uri("https://github.com/octocat/hello"));
+    }
+
+    [Test]
+    public async Task Refresh_with_unchanged_data_keeps_the_same_rows()
+    {
+        FakeNotificationsApi api = new(Sample.Threads(3), Sample.Threads(3));
+        InboxViewModel viewModel = Create(api);
+        await viewModel.LoadCommand.ExecuteAsync(null);
+        NotificationItem first = viewModel.Items[0];
+
+        await viewModel.RefreshCommand.ExecuteAsync(null);
+
+        await Assert.That(ReferenceEquals(viewModel.Items[0], first)).IsTrue();
+        await Assert.That(api.ListCalls.Count).IsEqualTo(2);
+    }
+
+    [Test]
+    public async Task Refresh_with_a_new_notification_replaces_the_rows()
+    {
+        FakeNotificationsApi api = new(Sample.Threads(2), [Sample.Thread("9", "New"), .. Sample.Threads(2)]);
+        InboxViewModel viewModel = Create(api);
+        await viewModel.LoadCommand.ExecuteAsync(null);
+
+        await viewModel.RefreshCommand.ExecuteAsync(null);
+
+        await Assert.That(viewModel.Items.Count).IsEqualTo(3);
+        await Assert.That(viewModel.Items[0].Title).IsEqualTo("New");
+    }
+
+    [Test]
+    public async Task Refresh_notices_a_row_that_was_read_elsewhere()
+    {
+        FakeNotificationsApi api = new(Sample.Threads(1), [Sample.Thread("1", unread: false)]);
+        InboxViewModel viewModel = Create(api);
+        await viewModel.LoadCommand.ExecuteAsync(null);
+
+        await viewModel.RefreshCommand.ExecuteAsync(null);
+
+        await Assert.That(viewModel.Items[0].IsUnread).IsFalse();
+    }
+
+    [Test]
+    public async Task A_failed_refresh_keeps_the_rows_and_shows_no_error()
+    {
+        FakeNotificationsApi api = new(Sample.Threads(2));
+        InboxViewModel viewModel = Create(api);
+        await viewModel.LoadCommand.ExecuteAsync(null);
+        api.FailNextWith = HttpStatusCode.BadGateway;
+
+        await viewModel.RefreshCommand.ExecuteAsync(null);
+
+        await Assert.That(viewModel.Items.Count).IsEqualTo(2);
+        await Assert.That(viewModel.ErrorMessage).IsNull();
     }
 }
