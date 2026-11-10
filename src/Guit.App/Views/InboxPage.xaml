@@ -27,6 +27,17 @@
         <SelectorBarItem Text="All" />
         <SelectorBarItem Text="Participating" />
       </SelectorBar>
+      <Button
+          Grid.Column="2"
+          VerticalAlignment="Center"
+          AutomationProperties.Name="Refresh"
+          Command="{x:Bind ViewModel.RefreshCommand}"
+          ToolTipService.ToolTip="Refresh (F5)">
+        <Button.KeyboardAccelerators>
+          <KeyboardAccelerator Key="F5" />
+        </Button.KeyboardAccelerators>
+        <FontIcon FontSize="16" Glyph="&#xE72C;" />
+      </Button>
     </Grid>
 
     <ListView

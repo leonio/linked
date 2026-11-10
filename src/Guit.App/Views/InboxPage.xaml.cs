@@ -16,6 +16,10 @@ public sealed partial class InboxPage : Page
         ViewModel = App.Services.GetRequiredService<InboxViewModel>();
         InitializeComponent();
         NavigationCacheMode = NavigationCacheMode.Required;
+
+        // Poll only while the page is on screen. Unloaded also covers signing out.
+        Loaded += (_, _) => ViewModel.StartPolling();
+        Unloaded += (_, _) => ViewModel.StopPolling();
     }
 
     public InboxViewModel ViewModel { get; }
