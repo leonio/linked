@@ -37,6 +37,7 @@ public sealed partial class ConversationViewModel(
     public partial bool IsPullRequest { get; private set; }
 
     [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(SendCommand))]
     public partial bool IsLoading { get; private set; }
 
     [ObservableProperty]
@@ -47,6 +48,17 @@ public sealed partial class ConversationViewModel(
 
     [ObservableProperty]
     public partial string? ErrorMessage { get; private set; }
+
+    /// <summary>The reply being written. Bound two-way to the reply box.</summary>
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(SendCommand))]
+    public partial string Draft { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(SendCommand))]
+    public partial bool IsSending { get; private set; }
+
+    private bool CanSend => !IsSending && !IsLoading && _link.Owner is not null && !string.IsNullOrWhiteSpace(Draft);
 
     /// <summary>Loads the conversation named by a navigation argument ("owner/repo#12" or "owner/repo!12").</summary>
     [RelayCommand]
@@ -121,6 +133,32 @@ public sealed partial class ConversationViewModel(
         finally
         {
             IsLoadingMore = false;
+        }
+    }
+
+    /// <summary>Posts <see cref="Draft"/> as a comment. The draft is kept if GitHub refuses it.</summary>
+    [RelayCommand(CanExecute = nameof(CanSend))]
+    private async Task SendAsync(CancellationToken cancellationToken)
+    {
+        IsSending = true;
+        ErrorMessage = null;
+        try
+        {
+            IssueComment created = await issues.CreateCommentAsync(
+                _link.Owner, _link.Repo, _link.Number, new CreateCommentRequest(Draft.Trim()), cancellationToken);
+            Comments.Add(CommentItem.From(created, time.GetUtcNow()));
+            Draft = string.Empty;
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (ApiExceptionBase ex)
+        {
+            ErrorMessage = ApiErrors.Describe(ex);
+        }
+        finally
+        {
+            IsSending = false;
         }
     }
 

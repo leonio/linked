@@ -102,4 +102,51 @@ public sealed class ConversationViewModelTests
         await Assert.That(navigator.BackCount).IsEqualTo(1);
         await Assert.That(launcher.Opened).IsEqualTo(new Uri("https://github.com/octocat/hello/pull/7"));
     }
+
+    [Test]
+    public async Task Send_is_only_possible_with_a_loaded_conversation_and_some_text()
+    {
+        ConversationViewModel viewModel = Create(new FakeIssuesApi(Sample.Issue()));
+        viewModel.Draft = "hello";
+        await Assert.That(viewModel.SendCommand.CanExecute(null)).IsFalse();
+
+        await viewModel.LoadCommand.ExecuteAsync("octocat/hello#7");
+        await Assert.That(viewModel.SendCommand.CanExecute(null)).IsTrue();
+
+        viewModel.Draft = "   ";
+        await Assert.That(viewModel.SendCommand.CanExecute(null)).IsFalse();
+    }
+
+    [Test]
+    public async Task Send_appends_the_new_comment_and_clears_the_draft()
+    {
+        FakeIssuesApi api = new(Sample.Issue());
+        ConversationViewModel viewModel = Create(api);
+        await viewModel.LoadCommand.ExecuteAsync("octocat/hello#7");
+        viewModel.Draft = "  Thanks!  ";
+
+        await viewModel.SendCommand.ExecuteAsync(null);
+
+        await Assert.That(api.Posted).Contains("Thanks!");
+        await Assert.That(viewModel.Comments[^1].Body).IsEqualTo("Thanks!");
+        await Assert.That(viewModel.Draft).IsEqualTo(string.Empty);
+        await Assert.That(viewModel.IsSending).IsFalse();
+    }
+
+    [Test]
+    public async Task A_failed_send_keeps_the_draft()
+    {
+        FakeIssuesApi api = new(Sample.Issue());
+        ConversationViewModel viewModel = Create(api);
+        await viewModel.LoadCommand.ExecuteAsync("octocat/hello#7");
+        viewModel.Draft = "Thanks!";
+        api.FailNextWith = HttpStatusCode.Forbidden;
+
+        await viewModel.SendCommand.ExecuteAsync(null);
+
+        await Assert.That(viewModel.Draft).IsEqualTo("Thanks!");
+        await Assert.That(viewModel.Comments.Count).IsEqualTo(1);
+        await Assert.That(viewModel.ErrorMessage).IsNotNull();
+        await Assert.That(viewModel.IsSending).IsFalse();
+    }
 }
