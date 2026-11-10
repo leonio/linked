@@ -2,7 +2,10 @@ using Guit.Core.Models;
 using Guit.Core.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Navigation;
+using Microsoft.UI.Xaml;
+using Windows.System;
 
 namespace Guit.App.Views;
 
@@ -41,6 +44,24 @@ public sealed partial class InboxPage : Page
         if (index >= 0)
         {
             ViewModel.Filter = (InboxFilter)index;
+        }
+    }
+
+    // x:Bind inside a DataTemplate cannot reach the page's view model, so row actions come through here.
+    private void OnMarkAsReadClick(object sender, RoutedEventArgs e)
+        => ViewModel.MarkAsReadCommand.Execute(((MenuFlyoutItem)sender).CommandParameter as NotificationItem);
+
+    private void OnMarkAsDoneClick(object sender, RoutedEventArgs e)
+        => ViewModel.MarkAsDoneCommand.Execute(((MenuFlyoutItem)sender).CommandParameter as NotificationItem);
+
+    private void OnListKeyDown(object sender, KeyRoutedEventArgs e)
+    {
+        if (e.Key == VirtualKey.Delete
+            && FocusManager.GetFocusedElement(XamlRoot) is ListViewItem container
+            && List.ItemFromContainer(container) is NotificationItem item)
+        {
+            ViewModel.MarkAsDoneCommand.Execute(item);
+            e.Handled = true;
         }
     }
 }

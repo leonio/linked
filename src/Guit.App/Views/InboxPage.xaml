@@ -35,6 +35,7 @@
         Padding="12,0,12,12"
         ContainerContentChanging="OnContainerContentChanging"
         ItemsSource="{x:Bind ViewModel.Items}"
+        KeyDown="OnListKeyDown"
         SelectionMode="None">
       <ListView.ItemTemplate>
         <DataTemplate x:DataType="models:NotificationItem">
@@ -48,6 +49,18 @@
               <ColumnDefinition Width="Auto" />
               <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
+            <Grid.ContextFlyout>
+              <MenuFlyout>
+                <MenuFlyoutItem
+                    Click="OnMarkAsReadClick"
+                    CommandParameter="{x:Bind}"
+                    Text="Mark as read" />
+                <MenuFlyoutItem
+                    Click="OnMarkAsDoneClick"
+                    CommandParameter="{x:Bind}"
+                    Text="Mark as done" />
+              </MenuFlyout>
+            </Grid.ContextFlyout>
             <FontIcon
                 VerticalAlignment="Center"
                 FontSize="16"
