@@ -51,7 +51,7 @@ one layer, one or two files plus tests, a worked example to copy.
 - [x] 3.4 `ConversationPage`: header, comment list
 - [x] 3.5 Reply box: send a comment
 - [x] 3.6 Reactions: show counts, add a reaction
-- [ ] 3.7 Pull request header: Pulls API + state, branches, diff size
+- [x] 3.7 Pull request header: Pulls API + state, branches, diff size
 - [ ] 3.8 "Pull requests" page: search API + list
 - [ ] 3.9 **[S]** Markdown rendering: evaluate options, pick one, implement
 

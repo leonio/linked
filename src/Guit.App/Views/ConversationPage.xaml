@@ -40,6 +40,14 @@
           <Run Text="·" />
           <Run Text="{x:Bind ViewModel.State, Mode=OneWay}" />
         </TextBlock>
+        <TextBlock
+            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+            Style="{StaticResource CaptionTextBlockStyle}"
+            Visibility="{x:Bind ViewModel.HasPullDetails, Mode=OneWay}">
+          <Run Text="{x:Bind ViewModel.Branches, Mode=OneWay}" />
+          <Run Text="·" />
+          <Run Text="{x:Bind ViewModel.DiffSummary, Mode=OneWay}" />
+        </TextBlock>
       </StackPanel>
       <Button
           Grid.Column="2"
