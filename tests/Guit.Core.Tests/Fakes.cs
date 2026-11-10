@@ -90,6 +90,19 @@ internal sealed class FakeLauncher : ILauncher
     public void CopyToClipboard(string text) => Clipboard = text;
 }
 
+internal sealed class FakeNavigator : INavigator
+{
+    public List<(Route Route, string? Argument)> Navigations { get; } = [];
+
+    public int BackCount { get; private set; }
+
+    public bool CanGoBack => Navigations.Count > 1;
+
+    public void Navigate(Route route, string? argument = null) => Navigations.Add((route, argument));
+
+    public void GoBack() => BackCount++;
+}
+
 internal sealed class FakeUsersApi(GitHubUser? user) : IUsersApi
 {
     public Task<GitHubUser> GetAuthenticatedAsync(CancellationToken cancellationToken)

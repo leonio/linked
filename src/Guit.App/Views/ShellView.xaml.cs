@@ -1,3 +1,5 @@
+using Guit.App.Services;
+using Guit.Core.Services;
 using Guit.Core.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Xaml;
@@ -7,9 +9,12 @@ namespace Guit.App.Views;
 
 public sealed partial class ShellView : UserControl
 {
+    private readonly Navigator _navigator;
+
     public ShellView()
     {
         ViewModel = App.Services.GetRequiredService<ShellViewModel>();
+        _navigator = App.Services.GetRequiredService<Navigator>();
         InitializeComponent();
         ViewModel.LoadUserCommand.Execute(null);
     }
@@ -17,17 +22,21 @@ public sealed partial class ShellView : UserControl
     public ShellViewModel ViewModel { get; }
 
     private void OnNavigationLoaded(object sender, RoutedEventArgs e)
-        => Navigation.SelectedItem ??= Navigation.MenuItems[0];
+    {
+        // The frame is created together with the NavigationView (x:Load), so hand it over here.
+        _navigator.Frame = ContentFrame;
+        Navigation.SelectedItem ??= Navigation.MenuItems[0];
+    }
 
     private void OnNavigationSelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
     {
-        // Navigate by typeof, never by a type name string: typeof keeps the page visible to the trimmer.
-        Type page = (args.SelectedItem as NavigationViewItem)?.Tag switch
+        Route route = (args.SelectedItem as NavigationViewItem)?.Tag switch
         {
-            "pulls" => typeof(PlaceholderPage),
-            _ => typeof(PlaceholderPage),
+            "pulls" => Route.PullRequests,
+            _ => Route.Inbox,
         };
 
-        ContentFrame.Navigate(page);
+        _navigator.Frame = ContentFrame;
+        _navigator.Navigate(route);
     }
 }
