@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 using Guit.Api.Auth;
 using Guit.Api.Issues;
 using Guit.Api.Notifications;
+using Guit.Api.Pulls;
 using Guit.Api.Reactions;
 using Guit.Api.Users;
 
@@ -28,6 +29,8 @@ namespace Guit.Api;
 [JsonSerializable(typeof(IssueComment[]))]
 // Notifications
 [JsonSerializable(typeof(NotificationThread[]))]
+// Pulls
+[JsonSerializable(typeof(PullRequest))]
 // Reactions
 [JsonSerializable(typeof(CreateReactionRequest))]
 // Users

@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using Guit.Api.Issues;
 using Guit.Api.Notifications;
+using Guit.Api.Pulls;
 using Guit.Api.Reactions;
 using Guit.Api.Users;
 using Guit.Core;
@@ -49,6 +50,8 @@ await conversation.LoadCommand.ExecuteAsync("octocat/hello!7");
 Check(conversation is { Title: "Fix it", IsPullRequest: true, Comments: [{ IsOpeningPost: true, Author: "octocat" }, { Author: "ghost", Body: "Looks good" }] }, "conversation view model");
 await provider.GetRequiredService<IReactionsApi>().CreateForIssueCommentAsync("octocat", "hello", 11, new CreateReactionRequest(ReactionContent.Heart), CancellationToken.None);
 Check(true, "reactions api: create");
+PullRequest pull = await provider.GetRequiredService<IPullsApi>().GetAsync("octocat", "hello", 7, CancellationToken.None);
+Check(pull is { Merged: false, Additions: 120, Head.Ref: "feature", Base.Ref: "main" }, "pulls api: get");
 
 InboxViewModel inbox = provider.GetRequiredService<InboxViewModel>();
 await inbox.LoadCommand.ExecuteAsync(null);
@@ -141,6 +144,7 @@ internal sealed class CannedHandler : HttpMessageHandler
             "/repos/octocat/hello/issues/7/comments" when authorized && request.Method == HttpMethod.Post && ReadBody(request) == """{"body":"Thanks"}"""
                 => """{"id":12,"created_at":"2026-01-03T00:00:00Z","html_url":"https://github.com/octocat/hello/pull/7#issuecomment-12","user":{"login":"octocat","id":583231,"avatar_url":"https://avatars/1","html_url":"https://github.com/octocat"},"body_text":"Thanks","body_html":"<p>Thanks</p>"}""",
             "/repos/octocat/hello/issues/comments/11/reactions" when authorized && ReadBody(request) == """{"content":"heart"}""" => """{"id":1,"content":"heart"}""",
+            "/repos/octocat/hello/pulls/7" when authorized => """{"number":7,"state":"open","merged":false,"draft":false,"mergeable":null,"additions":120,"deletions":8,"changed_files":5,"head":{"ref":"feature","label":"octocat:feature"},"base":{"ref":"main","label":"octocat:main"}}""",
             "/notifications/threads/1" when authorized => string.Empty,
             _ => null,
         };
