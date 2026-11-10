@@ -1,6 +1,7 @@
 using System.Net;
 using Guit.Api.Auth;
 using Guit.Api.Http;
+using Guit.Api.Issues;
 using Guit.Api.Notifications;
 using Guit.Api.Users;
 using Guit.Core.Services;
@@ -34,7 +35,44 @@ internal static class Sample
             Now.AddHours(-3),
             new NotificationSubject(title, type, url),
             new RepositorySummary(9, "hello", "octocat/hello", false, "https://github.com/octocat/hello",
-                new GitHubUser(1, "octocat", "https://avatars.githubusercontent.com/u/1?v=4", "https://github.com/octocat")));
+                Octocat));
+
+    public static readonly GitHubUser Octocat = new(1, "octocat", "https://avatars.githubusercontent.com/u/1?v=4", "https://github.com/octocat");
+
+    public static Issue Issue(string title = "Fix it", bool isPullRequest = true, string state = "open", GitHubUser? user = null, bool deletedUser = false)
+        => new(
+            70,
+            7,
+            title,
+            state,
+            1,
+            Now.AddDays(-2),
+            "https://github.com/octocat/hello/pull/7",
+            deletedUser ? null : user ?? Octocat,
+            "Please review",
+            "<p>Please <strong>review</strong></p>",
+            PullRequest: isPullRequest ? new IssuePullRequestRef("https://github.com/octocat/hello/pull/7") : null);
+
+    public static IssueComment Comment(long id, string body = "Looks good", string? association = "MEMBER", bool deletedUser = false)
+        => new(
+            id,
+            Now.AddHours(-3),
+            "https://github.com/octocat/hello/pull/7#issuecomment-" + id.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            deletedUser ? null : Octocat,
+            body,
+            "<p>" + body + "</p>",
+            association);
+
+    public static IssueComment[] Comments(int count, long firstId = 1)
+    {
+        IssueComment[] comments = new IssueComment[count];
+        for (int i = 0; i < count; i++)
+        {
+            comments[i] = Comment(firstId + i);
+        }
+
+        return comments;
+    }
 
     public static NotificationThread[] Threads(int count, int firstId = 1)
     {
@@ -181,6 +219,52 @@ internal sealed class FakeNotificationsApi(params NotificationThread[][] pages) 
     {
         MarkedDone.Add(threadId);
         return TakeFailure() is { } failure ? Task.FromException(failure) : Task.CompletedTask;
+    }
+
+    private ApiException? TakeFailure()
+    {
+        if (FailNextWith is not { } status)
+        {
+            return null;
+        }
+
+        FailNextWith = null;
+        return Failure.Status(status);
+    }
+}
+
+/// <summary>Returns one issue and the queued comment pages in order; records what was posted.</summary>
+internal sealed class FakeIssuesApi(Issue issue, params IssueComment[][] pages) : IIssuesApi
+{
+    private readonly Queue<IssueComment[]> _pages = new(pages);
+
+    /// <summary>When set, the next call fails with this status and the value is cleared.</summary>
+    public HttpStatusCode? FailNextWith { get; set; }
+
+    public List<(string Owner, string Repo, int Number, int Page)> ListCalls { get; } = [];
+
+    public List<string> Posted { get; } = [];
+
+    public Task<Issue> GetAsync(string owner, string repo, int issueNumber, CancellationToken cancellationToken)
+        => TakeFailure() is { } failure ? Task.FromException<Issue>(failure) : Task.FromResult(issue);
+
+    public Task<IssueComment[]> ListCommentsAsync(string owner, string repo, int issueNumber, int page, int perPage, CancellationToken cancellationToken)
+    {
+        ListCalls.Add((owner, repo, issueNumber, page));
+        return TakeFailure() is { } failure
+            ? Task.FromException<IssueComment[]>(failure)
+            : Task.FromResult(_pages.Count > 0 ? _pages.Dequeue() : []);
+    }
+
+    public Task<IssueComment> CreateCommentAsync(string owner, string repo, int issueNumber, CreateCommentRequest request, CancellationToken cancellationToken)
+    {
+        if (TakeFailure() is { } failure)
+        {
+            return Task.FromException<IssueComment>(failure);
+        }
+
+        Posted.Add(request.Body);
+        return Task.FromResult(Sample.Comment(1000 + Posted.Count, request.Body));
     }
 
     private ApiException? TakeFailure()

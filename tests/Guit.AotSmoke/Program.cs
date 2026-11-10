@@ -42,6 +42,10 @@ Check(comments is [{ Id: 11, BodyText: "Looks good", User: null }], "issues api:
 IssueComment posted = await issues.CreateCommentAsync("octocat", "hello", 7, new CreateCommentRequest("Thanks"), CancellationToken.None);
 Check(posted is { Id: 12, BodyText: "Thanks" }, "issues api: create comment");
 
+ConversationViewModel conversation = provider.GetRequiredService<ConversationViewModel>();
+await conversation.LoadCommand.ExecuteAsync("octocat/hello!7");
+Check(conversation is { Title: "Fix it", IsPullRequest: true, Comments: [{ IsOpeningPost: true, Author: "octocat" }, { Author: "ghost", Body: "Looks good" }] }, "conversation view model");
+
 InboxViewModel inbox = provider.GetRequiredService<InboxViewModel>();
 await inbox.LoadCommand.ExecuteAsync(null);
 Check(inbox.Items is [{ Title: "Fix it", Repository: "octocat/hello", IsUnread: true }], "inbox view model");
