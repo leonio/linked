@@ -41,7 +41,7 @@ one layer, one or two files plus tests, a worked example to copy.
 - [x] 2.7 Filters: Unread / All / Participating
 - [x] 2.8 Item actions: mark as read, mark as done
 - [x] 2.9 Refresh: button, F5, and a background poll
-- [ ] 2.10 Open a notification (`SubjectLink` parser; conversation or browser)
+- [x] 2.10 Open a notification (`SubjectLink` parser; conversation or browser)
 
 ## Phase 3 - Conversations, the messaging ([cards](tasks/phase-3-conversations.md))
 

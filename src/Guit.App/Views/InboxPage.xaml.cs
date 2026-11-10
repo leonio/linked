@@ -68,4 +68,7 @@ public sealed partial class InboxPage : Page
             e.Handled = true;
         }
     }
+
+    private void OnItemClick(object sender, ItemClickEventArgs e)
+        => ViewModel.OpenCommand.Execute(e.ClickedItem as NotificationItem);
 }
