@@ -120,6 +120,69 @@ public sealed partial class InboxViewModel(INotificationsApi notifications, Time
         }
     }
 
+    /// <summary>Marks a thread as read. The row updates at once and is put back if GitHub refuses.</summary>
+    [RelayCommand(AllowConcurrentExecutions = true)]
+    private async Task MarkAsReadAsync(NotificationItem? item, CancellationToken cancellationToken)
+    {
+        if (item is not { IsUnread: true })
+        {
+            return;
+        }
+
+        item.IsUnread = false;
+        try
+        {
+            await notifications.MarkAsReadAsync(item.Id, cancellationToken);
+            if (Filter == InboxFilter.Unread)
+            {
+                Items.Remove(item);
+                OnPropertyChanged(nameof(IsEmpty));
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            item.IsUnread = true;
+        }
+        catch (ApiExceptionBase ex)
+        {
+            item.IsUnread = true;
+            ErrorMessage = ApiErrors.Describe(ex);
+        }
+    }
+
+    /// <summary>Removes a thread from the inbox. The row goes at once and returns to its place if GitHub refuses.</summary>
+    [RelayCommand(AllowConcurrentExecutions = true)]
+    private async Task MarkAsDoneAsync(NotificationItem? item, CancellationToken cancellationToken)
+    {
+        int index = item is null ? -1 : Items.IndexOf(item);
+        if (index < 0)
+        {
+            return;
+        }
+
+        Items.RemoveAt(index);
+        OnPropertyChanged(nameof(IsEmpty));
+        try
+        {
+            await notifications.MarkAsDoneAsync(item!.Id, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            Restore(index, item!);
+        }
+        catch (ApiExceptionBase ex)
+        {
+            Restore(index, item!);
+            ErrorMessage = ApiErrors.Describe(ex);
+        }
+    }
+
+    private void Restore(int index, NotificationItem item)
+    {
+        Items.Insert(Math.Min(index, Items.Count), item);
+        OnPropertyChanged(nameof(IsEmpty));
+    }
+
     partial void OnFilterChanged(InboxFilter value) => LoadCommand.Execute(null);
 
     private Task<NotificationThread[]> ListPageAsync(int page, CancellationToken cancellationToken)

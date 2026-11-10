@@ -8,11 +8,13 @@ public sealed class InboxViewModelTests
 {
     private static readonly FixedTime Time = new(Sample.Now);
 
+    private static InboxViewModel Create(FakeNotificationsApi api) => new(api, Time);
+
     [Test]
     public async Task Load_fills_the_items_in_order()
     {
         FakeNotificationsApi api = new([Sample.Thread("1", "First"), Sample.Thread("2", "Second")]);
-        InboxViewModel viewModel = new(api, Time);
+        InboxViewModel viewModel = Create(api);
 
         await viewModel.LoadCommand.ExecuteAsync(null);
 
@@ -27,7 +29,7 @@ public sealed class InboxViewModelTests
     [Test]
     public async Task Loading_twice_does_not_duplicate_items()
     {
-        InboxViewModel viewModel = new(new FakeNotificationsApi(Sample.Threads(2), Sample.Threads(2)), Time);
+        InboxViewModel viewModel = Create(new FakeNotificationsApi(Sample.Threads(2), Sample.Threads(2)));
 
         await viewModel.LoadCommand.ExecuteAsync(null);
         await viewModel.LoadCommand.ExecuteAsync(null);
@@ -38,7 +40,7 @@ public sealed class InboxViewModelTests
     [Test]
     public async Task A_failed_load_sets_the_error_and_stops_loading()
     {
-        InboxViewModel viewModel = new(new FakeNotificationsApi { FailNextWith = HttpStatusCode.BadGateway }, Time);
+        InboxViewModel viewModel = Create(new FakeNotificationsApi { FailNextWith = HttpStatusCode.BadGateway });
 
         await viewModel.LoadCommand.ExecuteAsync(null);
 
@@ -51,7 +53,7 @@ public sealed class InboxViewModelTests
     [Test]
     public async Task An_empty_reply_is_reported_as_empty()
     {
-        InboxViewModel viewModel = new(new FakeNotificationsApi(), Time);
+        InboxViewModel viewModel = Create(new FakeNotificationsApi());
         await Assert.That(viewModel.IsEmpty).IsTrue();
 
         await viewModel.LoadCommand.ExecuteAsync(null);
@@ -64,7 +66,7 @@ public sealed class InboxViewModelTests
     public async Task LoadMore_appends_the_next_page_in_order()
     {
         FakeNotificationsApi api = new(Sample.Threads(50), Sample.Threads(3, firstId: 51));
-        InboxViewModel viewModel = new(api, Time);
+        InboxViewModel viewModel = Create(api);
         await viewModel.LoadCommand.ExecuteAsync(null);
         await Assert.That(viewModel.HasMore).IsTrue();
 
@@ -80,7 +82,7 @@ public sealed class InboxViewModelTests
     public async Task LoadMore_does_not_call_the_api_after_a_short_page()
     {
         FakeNotificationsApi api = new(Sample.Threads(2));
-        InboxViewModel viewModel = new(api, Time);
+        InboxViewModel viewModel = Create(api);
         await viewModel.LoadCommand.ExecuteAsync(null);
 
         await viewModel.LoadMoreCommand.ExecuteAsync(null);
@@ -92,7 +94,7 @@ public sealed class InboxViewModelTests
     public async Task A_failed_LoadMore_keeps_the_items_and_retries_the_same_page()
     {
         FakeNotificationsApi api = new(Sample.Threads(50));
-        InboxViewModel viewModel = new(api, Time);
+        InboxViewModel viewModel = Create(api);
         await viewModel.LoadCommand.ExecuteAsync(null);
 
         api.FailNextWith = HttpStatusCode.BadGateway;
@@ -114,7 +116,7 @@ public sealed class InboxViewModelTests
     public async Task Each_filter_sends_its_query(InboxFilter filter, bool all, bool participating)
     {
         FakeNotificationsApi api = new(Sample.Threads(50), Sample.Threads(1, firstId: 51));
-        InboxViewModel viewModel = new(api, Time);
+        InboxViewModel viewModel = Create(api);
 
         // Setting a different filter loads by itself; the default filter needs an explicit load.
         if (filter == InboxFilter.Unread)
@@ -136,7 +138,7 @@ public sealed class InboxViewModelTests
     public async Task Changing_the_filter_replaces_the_items_and_restarts_paging()
     {
         FakeNotificationsApi api = new(Sample.Threads(50), Sample.Threads(50, firstId: 51), [Sample.Thread("900", "Read one", unread: false)]);
-        InboxViewModel viewModel = new(api, Time);
+        InboxViewModel viewModel = Create(api);
         await viewModel.LoadCommand.ExecuteAsync(null);
         await viewModel.LoadMoreCommand.ExecuteAsync(null);
 
@@ -153,7 +155,7 @@ public sealed class InboxViewModelTests
     {
         TaskCompletionSource slow = new();
         FakeNotificationsApi api = new([Sample.Thread("1", "Stale unread")], [Sample.Thread("2", "Fresh all")]) { HoldNextList = slow };
-        InboxViewModel viewModel = new(api, Time);
+        InboxViewModel viewModel = Create(api);
 
         Task first = viewModel.LoadCommand.ExecuteAsync(null);
         viewModel.Filter = InboxFilter.All;
@@ -163,5 +165,76 @@ public sealed class InboxViewModelTests
         await Assert.That(viewModel.Items.Count).IsEqualTo(1);
         await Assert.That(viewModel.Items[0].Title).IsEqualTo("Fresh all");
         await Assert.That(viewModel.IsLoading).IsFalse();
+    }
+
+    [Test]
+    public async Task MarkAsRead_updates_the_row_and_removes_it_from_the_unread_view()
+    {
+        FakeNotificationsApi api = new(Sample.Threads(2));
+        InboxViewModel viewModel = Create(api);
+        await viewModel.LoadCommand.ExecuteAsync(null);
+        NotificationItem item = viewModel.Items[0];
+
+        await viewModel.MarkAsReadCommand.ExecuteAsync(item);
+
+        await Assert.That(item.IsUnread).IsFalse();
+        await Assert.That(api.MarkedRead).Contains("1");
+        await Assert.That(viewModel.Items.Count).IsEqualTo(1);
+    }
+
+    [Test]
+    public async Task MarkAsRead_keeps_the_row_when_showing_all()
+    {
+        FakeNotificationsApi api = new([], Sample.Threads(2));
+        InboxViewModel viewModel = Create(api);
+        viewModel.Filter = InboxFilter.All;
+
+        await viewModel.MarkAsReadCommand.ExecuteAsync(viewModel.Items[0]);
+
+        await Assert.That(viewModel.Items.Count).IsEqualTo(2);
+        await Assert.That(viewModel.Items[0].IsUnread).IsFalse();
+    }
+
+    [Test]
+    public async Task A_failed_MarkAsRead_puts_the_unread_state_back()
+    {
+        FakeNotificationsApi api = new(Sample.Threads(1));
+        InboxViewModel viewModel = Create(api);
+        await viewModel.LoadCommand.ExecuteAsync(null);
+        api.FailNextWith = HttpStatusCode.BadGateway;
+
+        await viewModel.MarkAsReadCommand.ExecuteAsync(viewModel.Items[0]);
+
+        await Assert.That(viewModel.Items[0].IsUnread).IsTrue();
+        await Assert.That(viewModel.ErrorMessage).IsNotNull();
+    }
+
+    [Test]
+    public async Task MarkAsDone_removes_the_row()
+    {
+        FakeNotificationsApi api = new(Sample.Threads(3));
+        InboxViewModel viewModel = Create(api);
+        await viewModel.LoadCommand.ExecuteAsync(null);
+
+        await viewModel.MarkAsDoneCommand.ExecuteAsync(viewModel.Items[1]);
+
+        await Assert.That(viewModel.Items.Count).IsEqualTo(2);
+        await Assert.That(viewModel.Items[1].Id).IsEqualTo("3");
+        await Assert.That(api.MarkedDone).Contains("2");
+    }
+
+    [Test]
+    public async Task A_failed_MarkAsDone_restores_the_row_at_its_original_position()
+    {
+        FakeNotificationsApi api = new(Sample.Threads(3));
+        InboxViewModel viewModel = Create(api);
+        await viewModel.LoadCommand.ExecuteAsync(null);
+        api.FailNextWith = HttpStatusCode.BadGateway;
+
+        await viewModel.MarkAsDoneCommand.ExecuteAsync(viewModel.Items[1]);
+
+        await Assert.That(viewModel.Items.Count).IsEqualTo(3);
+        await Assert.That(viewModel.Items[1].Id).IsEqualTo("2");
+        await Assert.That(viewModel.ErrorMessage).IsNotNull();
     }
 }
