@@ -20,6 +20,9 @@ public static class Bind
 
     public static bool IsNotEmpty(string? value) => !string.IsNullOrEmpty(value);
 
+    /// <summary>Read rows are dimmed; unread rows are fully opaque.</summary>
+    public static double UnreadOpacity(bool isUnread) => isUnread ? 1.0 : 0.55;
+
     /// <summary>
     /// Creates an image decoded at the size it is shown, so a 460px avatar does not sit in memory as 460px.
     /// </summary>

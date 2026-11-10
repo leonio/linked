@@ -17,6 +17,7 @@ internal sealed class Navigator : INavigator
         // typeof keeps each page visible to the trimmer. Never navigate by type name.
         Type page = route switch
         {
+            Route.Inbox => typeof(InboxPage),
             _ => typeof(PlaceholderPage),
         };
 
