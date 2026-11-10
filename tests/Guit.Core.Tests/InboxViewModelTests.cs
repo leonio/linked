@@ -58,4 +58,51 @@ public sealed class InboxViewModelTests
         await Assert.That(viewModel.IsEmpty).IsTrue();
         await Assert.That(viewModel.ErrorMessage).IsNull();
     }
+
+    [Test]
+    public async Task LoadMore_appends_the_next_page_in_order()
+    {
+        FakeNotificationsApi api = new(Sample.Threads(50), Sample.Threads(3, firstId: 51));
+        InboxViewModel viewModel = new(api, Time);
+        await viewModel.LoadCommand.ExecuteAsync(null);
+        await Assert.That(viewModel.HasMore).IsTrue();
+
+        await viewModel.LoadMoreCommand.ExecuteAsync(null);
+
+        await Assert.That(viewModel.Items.Count).IsEqualTo(53);
+        await Assert.That(viewModel.Items[50].Id).IsEqualTo("51");
+        await Assert.That(api.ListCalls[1].Page).IsEqualTo(2);
+        await Assert.That(viewModel.HasMore).IsFalse();
+    }
+
+    [Test]
+    public async Task LoadMore_does_not_call_the_api_after_a_short_page()
+    {
+        FakeNotificationsApi api = new(Sample.Threads(2));
+        InboxViewModel viewModel = new(api, Time);
+        await viewModel.LoadCommand.ExecuteAsync(null);
+
+        await viewModel.LoadMoreCommand.ExecuteAsync(null);
+
+        await Assert.That(api.ListCalls.Count).IsEqualTo(1);
+    }
+
+    [Test]
+    public async Task A_failed_LoadMore_keeps_the_items_and_retries_the_same_page()
+    {
+        FakeNotificationsApi api = new(Sample.Threads(50));
+        InboxViewModel viewModel = new(api, Time);
+        await viewModel.LoadCommand.ExecuteAsync(null);
+
+        api.FailNextWith = HttpStatusCode.BadGateway;
+        await viewModel.LoadMoreCommand.ExecuteAsync(null);
+        await Assert.That(viewModel.Items.Count).IsEqualTo(50);
+        await Assert.That(viewModel.ErrorMessage).IsNotNull();
+        await Assert.That(viewModel.IsLoadingMore).IsFalse();
+
+        api.Enqueue(Sample.Threads(1, firstId: 51));
+        await viewModel.LoadMoreCommand.ExecuteAsync(null);
+        await Assert.That(api.ListCalls[2].Page).IsEqualTo(2);
+        await Assert.That(viewModel.Items.Count).IsEqualTo(51);
+    }
 }
