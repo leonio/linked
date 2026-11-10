@@ -20,6 +20,7 @@
         x:Name="List"
         Grid.Row="1"
         Padding="12,0,12,12"
+        ContainerContentChanging="OnContainerContentChanging"
         ItemsSource="{x:Bind ViewModel.Items}"
         SelectionMode="None">
       <ListView.ItemTemplate>
@@ -71,6 +72,12 @@
         </DataTemplate>
       </ListView.ItemTemplate>
     </ListView>
+
+    <ProgressBar
+        Grid.Row="1"
+        VerticalAlignment="Bottom"
+        IsIndeterminate="True"
+        Visibility="{x:Bind ViewModel.IsLoadingMore, Mode=OneWay}" />
 
     <ProgressRing Grid.Row="1" IsActive="{x:Bind ViewModel.IsLoading, Mode=OneWay}" />
 

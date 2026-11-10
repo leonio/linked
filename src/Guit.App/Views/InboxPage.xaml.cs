@@ -24,4 +24,13 @@ public sealed partial class InboxPage : Page
             ViewModel.LoadCommand.Execute(null);
         }
     }
+
+    private void OnContainerContentChanging(ListViewBase sender, ContainerContentChangingEventArgs args)
+    {
+        // Ask for the next page shortly before the last row comes into view.
+        if (args.ItemIndex >= ViewModel.Items.Count - 10)
+        {
+            ViewModel.LoadMoreCommand.Execute(null);
+        }
+    }
 }

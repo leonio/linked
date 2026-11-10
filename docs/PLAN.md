@@ -37,7 +37,7 @@ one layer, one or two files plus tests, a worked example to copy.
 - [x] 2.3 `InboxViewModel`: first page, loading and error state
 - [x] 2.4 Navigation service (`INavigator`, `Route`)
 - [x] 2.5 `InboxPage`: virtualised list with an item template
-- [ ] 2.6 Paging: load more when the list nears its end
+- [x] 2.6 Paging: load more when the list nears its end
 - [ ] 2.7 Filters: Unread / All / Participating
 - [ ] 2.8 Item actions: mark as read, mark as done
 - [ ] 2.9 Refresh: button, F5, and a background poll
