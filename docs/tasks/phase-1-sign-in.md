@@ -20,8 +20,8 @@ How sign-in works (GitHub device flow, no client secret):
 1. GitHub -> Settings -> Developer settings -> OAuth Apps -> New OAuth App.
    Name: `Guit (dev)`. Homepage URL: the repository URL. Callback URL: `http://127.0.0.1` (unused by the device flow, but required).
 2. On the app's page tick **Enable Device Flow** and save. Copy the **Client ID**. Do not create a client secret.
-3. Put the client id in `src/Guit.App/AppConfig.cs` (replace `REPLACE_WITH_OAUTH_APP_CLIENT_ID`), or set the
-   `GUIT_GITHUB_CLIENT_ID` environment variable. A client id is public; committing it is fine.
+3. Done: the client id is set in `src/Guit.App/AppConfig.cs`. The `GUIT_GITHUB_CLIENT_ID` environment variable
+   overrides it. A client id is public; committing it is fine.
 4. `dotnet publish src/Guit.App -c Release -r win-x64 -p:Platform=x64`, run `artifacts\publish\Guit.App\release_win-x64\Guit.exe`.
 5. Check and write the results into the pull request or an issue:
    - [ ] the window opens with Mica and a title bar

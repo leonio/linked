@@ -10,5 +10,5 @@ internal static class AppConfig
     public static string GitHubClientId { get; } =
         Environment.GetEnvironmentVariable("GUIT_GITHUB_CLIENT_ID") is { Length: > 0 } fromEnvironment
             ? fromEnvironment
-            : "REPLACE_WITH_OAUTH_APP_CLIENT_ID";
+            : "Ov23lixGb2d0Qd0Wo2f3";
 }
