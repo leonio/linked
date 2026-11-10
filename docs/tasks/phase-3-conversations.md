@@ -86,6 +86,9 @@ JSON context: add `CreateCommentRequest` and `IssueComment` (single).
 **Copy** `InboxPage`.
 
 **Build** `Views/ConversationPage.xaml`; map `Route.Conversation`.
+- `InboxViewModel.OpenAsync` currently opens github.com in the browser. Change it here: when `SubjectLink.TryParse`
+  succeeds, call `navigator.Navigate(Route.Conversation, link.ToArgument())` instead (inject `INavigator`); keep the
+  browser fallback for other kinds. Update the two `Open_...` tests.
 - `OnNavigatedTo`: `ViewModel.LoadCommand.Execute(e.Parameter as string)`. No navigation cache (each conversation is a new page).
 - Header: back button (`INavigator.GoBack`; show it by setting `NavigationView.IsBackButtonVisible` / handling `BackRequested` in `ShellView`),
   `Title` (`SubtitleTextBlockStyle`, wraps to 2 lines), `Subtitle` + `State` in caption style.

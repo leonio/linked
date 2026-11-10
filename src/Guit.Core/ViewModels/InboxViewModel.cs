@@ -9,7 +9,10 @@ using Refit;
 namespace Guit.Core.ViewModels;
 
 /// <summary>The inbox: the member's notification threads, newest first.</summary>
-public sealed partial class InboxViewModel(INotificationsApi notifications, TimeProvider time) : ObservableObject
+public sealed partial class InboxViewModel(
+    INotificationsApi notifications,
+    ILauncher launcher,
+    TimeProvider time) : ObservableObject
 {
     private const int PageSize = 50;
 
@@ -175,6 +178,25 @@ public sealed partial class InboxViewModel(INotificationsApi notifications, Time
             Restore(index, item!);
             ErrorMessage = ApiErrors.Describe(ex);
         }
+    }
+
+    /// <summary>
+    /// Opens the issue or pull request behind a row and marks the row as read.
+    /// It opens on github.com for now; the in-app conversation page (plan phase 3) will take over.
+    /// </summary>
+    [RelayCommand(AllowConcurrentExecutions = true)]
+    private async Task OpenAsync(NotificationItem? item, CancellationToken cancellationToken)
+    {
+        if (item is null)
+        {
+            return;
+        }
+
+        Uri target = SubjectLink.TryParse(item.SubjectUrl, out SubjectLink link)
+            ? link.ToWebUri()
+            : new Uri("https://github.com/" + item.Repository);
+        await launcher.OpenAsync(target);
+        await MarkAsReadAsync(item, cancellationToken);
     }
 
     private void Restore(int index, NotificationItem item)

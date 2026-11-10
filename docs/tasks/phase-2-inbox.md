@@ -240,7 +240,8 @@ replaces contents; polling test with `Microsoft.Extensions.Time.Testing.FakeTime
   otherwise open `https://github.com/{item.Repository}` with the launcher. Then run `MarkAsReadCommand` if the item is unread.
 - `InboxPage`: `ItemClick` handler -> `ViewModel.OpenCommand.Execute((NotificationItem)e.ClickedItem)`.
 
-Until Phase 3 exists, `Route.Conversation` shows the placeholder page. That is expected.
+**As built**: until the conversation page exists (card 3.4), `OpenAsync` opens the issue or pull request on
+github.com (`link.ToWebUri()`) instead of navigating to a placeholder page. Card 3.4 switches it to in-app navigation.
 
 **Tests**: `TryParse` for an issue URL, a pull URL, null, a release URL (false), garbage (false); round trip
 `ToArgument` -> `TryParseArgument`; `OpenAsync` navigates for issues/pulls and launches the browser for other kinds.

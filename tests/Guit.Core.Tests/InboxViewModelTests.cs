@@ -8,7 +8,8 @@ public sealed class InboxViewModelTests
 {
     private static readonly FixedTime Time = new(Sample.Now);
 
-    private static InboxViewModel Create(FakeNotificationsApi api) => new(api, Time);
+    private static InboxViewModel Create(FakeNotificationsApi api, FakeLauncher? launcher = null)
+        => new(api, launcher ?? new FakeLauncher(), Time);
 
     [Test]
     public async Task Load_fills_the_items_in_order()
@@ -236,5 +237,32 @@ public sealed class InboxViewModelTests
         await Assert.That(viewModel.Items.Count).IsEqualTo(3);
         await Assert.That(viewModel.Items[1].Id).IsEqualTo("2");
         await Assert.That(viewModel.ErrorMessage).IsNotNull();
+    }
+
+    [Test]
+    public async Task Open_shows_the_pull_request_and_marks_the_row_as_read()
+    {
+        FakeNotificationsApi api = new(Sample.Threads(1));
+        FakeLauncher launcher = new();
+        InboxViewModel viewModel = Create(api, launcher);
+        await viewModel.LoadCommand.ExecuteAsync(null);
+
+        await viewModel.OpenCommand.ExecuteAsync(viewModel.Items[0]);
+
+        await Assert.That(launcher.Opened).IsEqualTo(new Uri("https://github.com/octocat/hello/pull/7"));
+        await Assert.That(api.MarkedRead).Contains("1");
+    }
+
+    [Test]
+    public async Task Open_falls_back_to_the_repository_for_other_kinds()
+    {
+        FakeNotificationsApi api = new([Sample.Thread("1", type: "CheckSuite", url: null)]);
+        FakeLauncher launcher = new();
+        InboxViewModel viewModel = Create(api, launcher);
+        await viewModel.LoadCommand.ExecuteAsync(null);
+
+        await viewModel.OpenCommand.ExecuteAsync(viewModel.Items[0]);
+
+        await Assert.That(launcher.Opened).IsEqualTo(new Uri("https://github.com/octocat/hello"));
     }
 }
