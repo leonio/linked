@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="Guit.App.Views.ConversationPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:models="using:Guit.Core.Models"
+    xmlns:xaml="using:Guit.App.Xaml">
+  <Grid>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+    </Grid.RowDefinitions>
+
+    <Grid Margin="16,16,24,8" ColumnSpacing="12">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="Auto" />
+        <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="Auto" />
+      </Grid.ColumnDefinitions>
+      <Button
+          VerticalAlignment="Top"
+          AutomationProperties.Name="Back"
+          Command="{x:Bind ViewModel.GoBackCommand}"
+          ToolTipService.ToolTip="Back (Alt+Left)">
+        <Button.KeyboardAccelerators>
+          <KeyboardAccelerator Key="Left" Modifiers="Menu" />
+        </Button.KeyboardAccelerators>
+        <FontIcon FontSize="16" Glyph="&#xE72B;" />
+      </Button>
+      <StackPanel Grid.Column="1" Spacing="2">
+        <TextBlock
+            MaxLines="2"
+            Style="{StaticResource SubtitleTextBlockStyle}"
+            Text="{x:Bind ViewModel.Title, Mode=OneWay}"
+            TextTrimming="CharacterEllipsis"
+            TextWrapping="Wrap" />
+        <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" Style="{StaticResource CaptionTextBlockStyle}">
+          <Run Text="{x:Bind ViewModel.Subtitle, Mode=OneWay}" />
+          <Run Text="·" />
+          <Run Text="{x:Bind ViewModel.State, Mode=OneWay}" />
+        </TextBlock>
+      </StackPanel>
+      <Button
+          Grid.Column="2"
+          VerticalAlignment="Top"
+          AutomationProperties.Name="Open on GitHub"
+          Command="{x:Bind ViewModel.OpenInBrowserCommand}"
+          ToolTipService.ToolTip="Open on GitHub">
+        <FontIcon FontSize="16" Glyph="&#xE8A7;" />
+      </Button>
+    </Grid>
+
+    <ListView
+        x:Name="List"
+        Grid.Row="1"
+        Padding="12,0,12,12"
+        ContainerContentChanging="OnContainerContentChanging"
+        ItemsSource="{x:Bind ViewModel.Comments}"
+        SelectionMode="None">
+      <ListView.ItemTemplate>
+        <DataTemplate x:DataType="models:CommentItem">
+          <Grid
+              Margin="0,4"
+              Padding="12"
+              Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+              BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+              BorderThickness="1"
+              ColumnSpacing="8"
+              CornerRadius="{ThemeResource ControlCornerRadius}"
+              RowSpacing="8">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="Auto" />
+              <ColumnDefinition Width="Auto" />
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <Image
+                Width="24"
+                Height="24"
+                x:Phase="1"
+                Source="{x:Bind xaml:Bind.Image(AvatarUrl, 24)}" />
+            <TextBlock
+                Grid.Column="1"
+                VerticalAlignment="Center"
+                Style="{StaticResource BodyStrongTextBlockStyle}"
+                Text="{x:Bind Author}" />
+            <TextBlock
+                Grid.Column="2"
+                VerticalAlignment="Center"
+                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                Style="{StaticResource CaptionTextBlockStyle}"
+                Text="{x:Bind Association}" />
+            <TextBlock
+                Grid.Column="3"
+                VerticalAlignment="Center"
+                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                Style="{StaticResource CaptionTextBlockStyle}"
+                Text="{x:Bind Posted}" />
+            <TextBlock
+                Grid.Row="1"
+                Grid.ColumnSpan="4"
+                IsTextSelectionEnabled="True"
+                Text="{x:Bind Body}"
+                TextWrapping="Wrap" />
+          </Grid>
+        </DataTemplate>
+      </ListView.ItemTemplate>
+    </ListView>
+
+    <ProgressBar
+        Grid.Row="1"
+        VerticalAlignment="Bottom"
+        IsIndeterminate="True"
+        Visibility="{x:Bind ViewModel.IsLoadingMore, Mode=OneWay}" />
+
+    <ProgressRing Grid.Row="1" IsActive="{x:Bind ViewModel.IsLoading, Mode=OneWay}" />
+
+    <InfoBar
+        Grid.Row="1"
+        Margin="24,0"
+        VerticalAlignment="Top"
+        IsClosable="False"
+        IsOpen="{x:Bind xaml:Bind.IsNotEmpty(ViewModel.ErrorMessage), Mode=OneWay}"
+        Message="{x:Bind ViewModel.ErrorMessage, Mode=OneWay}"
+        Severity="Error" />
+  </Grid>
+</Page>

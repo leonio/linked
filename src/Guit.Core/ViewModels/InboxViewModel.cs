@@ -11,6 +11,7 @@ namespace Guit.Core.ViewModels;
 /// <summary>The inbox: the member's notification threads, newest first.</summary>
 public sealed partial class InboxViewModel(
     INotificationsApi notifications,
+    INavigator navigator,
     ILauncher launcher,
     IUiDispatcher dispatcher,
     TimeProvider time) : ObservableObject
@@ -258,8 +259,8 @@ public sealed partial class InboxViewModel(
     }
 
     /// <summary>
-    /// Opens the issue or pull request behind a row and marks the row as read.
-    /// It opens on github.com for now; the in-app conversation page (plan phase 3) will take over.
+    /// Opens a row and marks it as read. Issues and pull requests open in the app;
+    /// other kinds (releases, check suites...) open the repository on github.com.
     /// </summary>
     [RelayCommand(AllowConcurrentExecutions = true)]
     private async Task OpenAsync(NotificationItem? item, CancellationToken cancellationToken)
@@ -269,10 +270,15 @@ public sealed partial class InboxViewModel(
             return;
         }
 
-        Uri target = SubjectLink.TryParse(item.SubjectUrl, out SubjectLink link)
-            ? link.ToWebUri()
-            : new Uri("https://github.com/" + item.Repository);
-        await launcher.OpenAsync(target);
+        if (SubjectLink.TryParse(item.SubjectUrl, out SubjectLink link))
+        {
+            navigator.Navigate(Route.Conversation, link.ToArgument());
+        }
+        else
+        {
+            await launcher.OpenAsync(new Uri("https://github.com/" + item.Repository));
+        }
+
         await MarkAsReadAsync(item, cancellationToken);
     }
 

@@ -1,5 +1,6 @@
 using System.Net;
 using Guit.Core.Models;
+using Guit.Core.Services;
 using Guit.Core.ViewModels;
 
 namespace Guit.Core.Tests;
@@ -8,8 +9,8 @@ public sealed class InboxViewModelTests
 {
     private static readonly FixedTime Time = new(Sample.Now);
 
-    private static InboxViewModel Create(FakeNotificationsApi api, FakeLauncher? launcher = null)
-        => new(api, launcher ?? new FakeLauncher(), new ImmediateDispatcher(), Time);
+    private static InboxViewModel Create(FakeNotificationsApi api, FakeLauncher? launcher = null, FakeNavigator? navigator = null)
+        => new(api, navigator ?? new FakeNavigator(), launcher ?? new FakeLauncher(), new ImmediateDispatcher(), Time);
 
     [Test]
     public async Task Load_fills_the_items_in_order()
@@ -240,16 +241,16 @@ public sealed class InboxViewModelTests
     }
 
     [Test]
-    public async Task Open_shows_the_pull_request_and_marks_the_row_as_read()
+    public async Task Open_navigates_to_the_conversation_and_marks_the_row_as_read()
     {
         FakeNotificationsApi api = new(Sample.Threads(1));
-        FakeLauncher launcher = new();
-        InboxViewModel viewModel = Create(api, launcher);
+        FakeNavigator navigator = new();
+        InboxViewModel viewModel = Create(api, navigator: navigator);
         await viewModel.LoadCommand.ExecuteAsync(null);
 
         await viewModel.OpenCommand.ExecuteAsync(viewModel.Items[0]);
 
-        await Assert.That(launcher.Opened).IsEqualTo(new Uri("https://github.com/octocat/hello/pull/7"));
+        await Assert.That(navigator.Navigations[0]).IsEqualTo((Route.Conversation, (string?)"octocat/hello!7"));
         await Assert.That(api.MarkedRead).Contains("1");
     }
 

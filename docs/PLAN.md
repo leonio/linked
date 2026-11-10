@@ -48,7 +48,7 @@ one layer, one or two files plus tests, a worked example to copy.
 - [x] 3.1 Issues API: get issue, list comments
 - [x] 3.2 Issues API: create comment
 - [x] 3.3 `ConversationViewModel`: issue + comments, paging
-- [ ] 3.4 `ConversationPage`: header, comment list
+- [x] 3.4 `ConversationPage`: header, comment list
 - [ ] 3.5 Reply box: send a comment
 - [ ] 3.6 Reactions: show counts, add a reaction
 - [ ] 3.7 Pull request header: Pulls API + state, branches, diff size

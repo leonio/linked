@@ -15,6 +15,7 @@ using Microsoft.Extensions.DependencyInjection;
 ServiceCollection services = new();
 services.AddSingleton<ITokenStore, MemoryTokenStore>();
 services.AddSingleton<ILauncher, NullLauncher>();
+services.AddSingleton<INavigator, NullNavigator>();
 services.AddSingleton<IUiDispatcher, InlineDispatcher>();
 services.AddSingleton(new GitHubOptions("smoke-client"));
 services.AddGuitCore(static () => new CannedHandler());
@@ -93,6 +94,19 @@ internal sealed class MemoryTokenStore : ITokenStore
 internal sealed class InlineDispatcher : IUiDispatcher
 {
     public void Post(Action action) => action();
+}
+
+internal sealed class NullNavigator : INavigator
+{
+    public bool CanGoBack => false;
+
+    public void Navigate(Route route, string? argument = null)
+    {
+    }
+
+    public void GoBack()
+    {
+    }
 }
 
 internal sealed class NullLauncher : ILauncher

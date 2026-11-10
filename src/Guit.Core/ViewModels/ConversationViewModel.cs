@@ -9,7 +9,11 @@ using Refit;
 namespace Guit.Core.ViewModels;
 
 /// <summary>One issue or pull request: a header, the opening post, and the comments oldest first.</summary>
-public sealed partial class ConversationViewModel(IIssuesApi issues, TimeProvider time) : ObservableObject
+public sealed partial class ConversationViewModel(
+    IIssuesApi issues,
+    INavigator navigator,
+    ILauncher launcher,
+    TimeProvider time) : ObservableObject
 {
     private const int PageSize = 50;
 
@@ -119,6 +123,14 @@ public sealed partial class ConversationViewModel(IIssuesApi issues, TimeProvide
             IsLoadingMore = false;
         }
     }
+
+    [RelayCommand]
+    private void GoBack() => navigator.GoBack();
+
+    /// <summary>Shows this conversation on github.com.</summary>
+    [RelayCommand]
+    private Task OpenInBrowserAsync()
+        => _link.Owner is null ? Task.CompletedTask : launcher.OpenAsync(_link.ToWebUri());
 
     private void Append(IssueComment[] page)
     {

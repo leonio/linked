@@ -7,7 +7,8 @@ public sealed class ConversationViewModelTests
 {
     private static readonly FixedTime Time = new(Sample.Now);
 
-    private static ConversationViewModel Create(FakeIssuesApi api) => new(api, Time);
+    private static ConversationViewModel Create(FakeIssuesApi api, FakeNavigator? navigator = null, FakeLauncher? launcher = null)
+        => new(api, navigator ?? new FakeNavigator(), launcher ?? new FakeLauncher(), Time);
 
     [Test]
     public async Task Load_fills_the_header_and_lists_the_opening_post_first()
@@ -85,5 +86,20 @@ public sealed class ConversationViewModelTests
         await Assert.That(viewModel.Comments[1].Author).IsEqualTo("ghost");
         await Assert.That(viewModel.Comments[1].AvatarUrl).IsEqualTo(string.Empty);
         await Assert.That(viewModel.Comments[1].Association).IsNull();
+    }
+
+    [Test]
+    public async Task GoBack_and_OpenInBrowser_use_the_app_services()
+    {
+        FakeNavigator navigator = new();
+        FakeLauncher launcher = new();
+        ConversationViewModel viewModel = Create(new FakeIssuesApi(Sample.Issue()), navigator, launcher);
+        await viewModel.LoadCommand.ExecuteAsync("octocat/hello!7");
+
+        viewModel.GoBackCommand.Execute(null);
+        await viewModel.OpenInBrowserCommand.ExecuteAsync(null);
+
+        await Assert.That(navigator.BackCount).IsEqualTo(1);
+        await Assert.That(launcher.Opened).IsEqualTo(new Uri("https://github.com/octocat/hello/pull/7"));
     }
 }
