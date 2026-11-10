@@ -110,11 +110,11 @@
                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                 Style="{StaticResource CaptionTextBlockStyle}"
                 Text="{x:Bind Posted}" />
-            <TextBlock
+            <RichTextBlock
                 Grid.Row="1"
                 Grid.ColumnSpan="4"
+                xaml:Rich.Document="{x:Bind Content}"
                 IsTextSelectionEnabled="True"
-                Text="{x:Bind Body}"
                 TextWrapping="Wrap" />
             <StackPanel
                 Grid.Row="2"

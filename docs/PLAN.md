@@ -53,7 +53,7 @@ one layer, one or two files plus tests, a worked example to copy.
 - [x] 3.6 Reactions: show counts, add a reaction
 - [x] 3.7 Pull request header: Pulls API + state, branches, diff size
 - [x] 3.8 "Pull requests" page: search API + list
-- [ ] 3.9 **[S]** Markdown rendering: evaluate options, pick one, implement
+- [x] 3.9 **[S]** Markdown rendering: evaluate options, pick one, implement
 
 ## Phase 4 - Actions, the jobs ([cards](tasks/phase-4-actions.md))
 
@@ -81,4 +81,4 @@ one layer, one or two files plus tests, a worked example to copy.
 - Sign-in uses an **OAuth App** with the device flow, not a GitHub App: notification endpoints are not
   available to GitHub App tokens (`ghapi.py op` prints this per operation).
 - Discussions and review-thread resolution exist only in the GraphQL API. Out of scope until Phase 3 is done.
-- Comment text is shown as plain text (`body_text`) until 3.9 lands.
+- Comment formatting is a first version: code blocks wrap, tables show one row per line, images are links.

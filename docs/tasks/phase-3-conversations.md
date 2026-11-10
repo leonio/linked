@@ -191,6 +191,12 @@ The search API allows 30 requests per minute. Do not poll this page.
 
 **Layer** all - **Skills** all - **Depends on** 3.4
 
+**Decision (done): option 1.** `Guit.Core/Text/HtmlRichText.cs` parses GitHub's `body_html` into a `RichDocument`
+(a flat list of styled blocks) when the comment item is created; `Guit.App/Xaml/Rich.cs` draws it in a `RichTextBlock`
+through the `Rich.Document` attached property. No new dependency. Known limits, on purpose for a first version:
+code blocks wrap instead of scrolling sideways, tables are shown one row per line, images are shown as links,
+and quotes are marked with a bar character and italics rather than a coloured background.
+
 Comments are Markdown. Until this card they are plain text. This is a design task; do not hand it to a small model.
 
 Decide between, and record the decision at the top of this card:
