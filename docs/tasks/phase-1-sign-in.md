@@ -36,7 +36,7 @@ window; it cannot click "Sign in". Expect to find small problems here; report th
 
 ---
 
-## 1.5 [S] Sign out automatically on HTTP 401
+## 1.5 [S] Sign out automatically on HTTP 401 (done)
 
 **Layer** Api + Core + App - **Skills** `aot-rules`, `viewmodel`, `winui-xaml` - **Depends on** 1.4
 

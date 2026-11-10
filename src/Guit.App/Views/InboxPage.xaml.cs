@@ -1,10 +1,10 @@
 using Guit.Core.Models;
 using Guit.Core.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Navigation;
-using Microsoft.UI.Xaml;
 using Windows.System;
 
 namespace Guit.App.Views;

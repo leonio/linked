@@ -5,7 +5,8 @@ description: Rules, templates and known compiler traps for XAML and code-behind 
 
 # WinUI XAML (Guit.App)
 
-Worked examples to copy: `Views/ShellView.xaml`, `Views/SignInView.xaml`, `Xaml/Bind.cs`, `MainWindow.xaml`.
+Worked examples to copy: `Views/InboxPage.xaml` (+ `.xaml.cs`: the full list page), `Views/ShellView.xaml`,
+`Views/SignInView.xaml`, `Xaml/Bind.cs`, `MainWindow.xaml`.
 
 Guit.App only builds on Windows. If you are elsewhere, write the XAML carefully against this skill, push,
 and read the "WinUI app" job in CI. Say in your report that it was verified by CI only (or not at all).
@@ -49,7 +50,8 @@ Add `xmlns:xaml="using:Guit.App.Xaml"` to use `Bind`. New helpers go in `Xaml/Bi
 - **Event handlers that do not use `this`** fail the build with CA1822. Use a named element or `ViewModel` in the handler
   (that is what handlers are for), or make the handler `static`.
 - **`x:Bind` inside a `DataTemplate` cannot see the page.** To run a page-level command from an item, use a `Click`
-  handler in code-behind: `ViewModel.OpenCommand.Execute(((FrameworkElement)sender).DataContext as NotificationItem);`
+  handler in code-behind and pass the item with `CommandParameter="{x:Bind}"`:
+  `ViewModel.MarkAsDoneCommand.Execute(((MenuFlyoutItem)sender).CommandParameter as NotificationItem);`
 - **`WMC1506` ("OneWay bindings require ... notifications")** means the path has no property that raises change
   notifications. Either the property should be `[ObservableProperty]`, or the binding should not be `OneWay`.
 - XAML compiler errors point at `obj\...\*.g.cs`. The cause is always in the `.xaml` file of the same name;

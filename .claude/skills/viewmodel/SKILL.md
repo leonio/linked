@@ -5,7 +5,8 @@ description: Rules and templates for view models, item models and services in sr
 
 # View models (Guit.Core)
 
-Worked examples to copy: `ViewModels/SignInViewModel.cs`, `ViewModels/ShellViewModel.cs`, `Services/Session.cs`,
+Worked examples to copy: `ViewModels/InboxViewModel.cs` (the full list pattern: load, paging, filter, row actions, refresh),
+`ViewModels/SignInViewModel.cs`, `ViewModels/ShellViewModel.cs`, `Services/Session.cs`,
 and their tests in `tests/Guit.Core.Tests/`.
 
 Guit.Core must not reference WinUI. No `Microsoft.UI.*`, no `Windows.*`, no `DispatcherQueue`, no `Visibility`,
@@ -75,6 +76,11 @@ public sealed partial class InboxViewModel(INotificationsApi notifications) : Ob
   Refit throws `Refit.ApiExceptionBase` for every failed call (error status **and** no connection). It does **not**
   derive from `HttpRequestException`, so `catch (HttpRequestException)` catches nothing. Never let an exception
   escape a command (it would crash the app); never catch bare `Exception`.
+
+- Anything that arrives off the UI thread (a timer tick, an HTTP handler callback) goes through `IUiDispatcher.Post`
+  before it touches a view model. See `InboxViewModel.OnPollTick` and `Session.OnUnauthorized`.
+- A load that can be started again while it is running (filter change, refresh) must ignore the older reply.
+  Copy the `_generation` counter in `InboxViewModel.LoadAsync`.
 
 **Data**
 - XAML never binds to `Guit.Api` DTOs. Map each DTO to an **item model** in `Guit.Core/Models/`:
