@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Guit.Api.Issues;
+using Guit.Api.Reactions;
 using Guit.Core.Models;
 using Guit.Core.Services;
 using Refit;
@@ -11,6 +12,7 @@ namespace Guit.Core.ViewModels;
 /// <summary>One issue or pull request: a header, the opening post, and the comments oldest first.</summary>
 public sealed partial class ConversationViewModel(
     IIssuesApi issues,
+    IReactionsApi reactions,
     INavigator navigator,
     ILauncher launcher,
     TimeProvider time) : ObservableObject
@@ -159,6 +161,30 @@ public sealed partial class ConversationViewModel(
         finally
         {
             IsSending = false;
+        }
+    }
+
+    /// <summary>
+    /// Adds the member's reaction to a post. The count goes up at once and comes back down if GitHub refuses.
+    /// (If the member had already reacted this way GitHub changes nothing, and the next load corrects the count.)
+    /// </summary>
+    /// <param name="item">The post to react to.</param>
+    /// <param name="content">One of <see cref="ReactionContent.All"/>.</param>
+    public async Task ReactAsync(CommentItem item, string content)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+        item.AdjustReaction(content, +1);
+        try
+        {
+            CreateReactionRequest request = new(content);
+            await (item.IsOpeningPost
+                ? reactions.CreateForIssueAsync(_link.Owner, _link.Repo, _link.Number, request, CancellationToken.None)
+                : reactions.CreateForIssueCommentAsync(_link.Owner, _link.Repo, item.Id, request, CancellationToken.None));
+        }
+        catch (ApiExceptionBase ex)
+        {
+            item.AdjustReaction(content, -1);
+            ErrorMessage = ApiErrors.Describe(ex);
         }
     }
 

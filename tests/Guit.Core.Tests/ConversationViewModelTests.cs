@@ -1,4 +1,5 @@
 using System.Net;
+using Guit.Api.Reactions;
 using Guit.Core.ViewModels;
 
 namespace Guit.Core.Tests;
@@ -7,8 +8,8 @@ public sealed class ConversationViewModelTests
 {
     private static readonly FixedTime Time = new(Sample.Now);
 
-    private static ConversationViewModel Create(FakeIssuesApi api, FakeNavigator? navigator = null, FakeLauncher? launcher = null)
-        => new(api, navigator ?? new FakeNavigator(), launcher ?? new FakeLauncher(), Time);
+    private static ConversationViewModel Create(FakeIssuesApi api, FakeNavigator? navigator = null, FakeLauncher? launcher = null, FakeReactionsApi? reactions = null)
+        => new(api, reactions ?? new FakeReactionsApi(), navigator ?? new FakeNavigator(), launcher ?? new FakeLauncher(), Time);
 
     [Test]
     public async Task Load_fills_the_header_and_lists_the_opening_post_first()
@@ -148,5 +149,49 @@ public sealed class ConversationViewModelTests
         await Assert.That(viewModel.Comments.Count).IsEqualTo(1);
         await Assert.That(viewModel.ErrorMessage).IsNotNull();
         await Assert.That(viewModel.IsSending).IsFalse();
+    }
+
+    [Test]
+    public async Task Reaction_counts_are_summarised_in_GitHub_order_without_zeroes()
+    {
+        FakeIssuesApi api = new(Sample.Issue(), [Sample.Comment(11, reactions: Sample.Reactions(plusOne: 3, heart: 1)), Sample.Comment(12)]);
+        ConversationViewModel viewModel = Create(api);
+
+        await viewModel.LoadCommand.ExecuteAsync("octocat/hello#7");
+
+        await Assert.That(viewModel.Comments[1].ReactionSummary).IsEqualTo("\U0001F44D 3  \u2764\uFE0F 1");
+        await Assert.That(viewModel.Comments[1].HasReactions).IsTrue();
+        await Assert.That(viewModel.Comments[2].ReactionSummary).IsEqualTo(string.Empty);
+        await Assert.That(viewModel.Comments[2].HasReactions).IsFalse();
+    }
+
+    [Test]
+    public async Task React_bumps_the_count_and_calls_the_right_endpoint()
+    {
+        FakeReactionsApi reactions = new();
+        FakeIssuesApi api = new(Sample.Issue(), [Sample.Comment(11)]);
+        ConversationViewModel viewModel = Create(api, reactions: reactions);
+        await viewModel.LoadCommand.ExecuteAsync("octocat/hello#7");
+
+        await viewModel.ReactAsync(viewModel.Comments[1], ReactionContent.Rocket);
+        await viewModel.ReactAsync(viewModel.Comments[0], ReactionContent.Heart);
+
+        await Assert.That(viewModel.Comments[1].ReactionSummary).IsEqualTo("\U0001F680 1");
+        await Assert.That(reactions.Calls).Contains("comment:11:rocket");
+        await Assert.That(reactions.Calls).Contains("issue:7:heart");
+    }
+
+    [Test]
+    public async Task A_refused_reaction_is_taken_back()
+    {
+        FakeReactionsApi reactions = new() { FailNextWith = HttpStatusCode.Forbidden };
+        FakeIssuesApi api = new(Sample.Issue(), [Sample.Comment(11, reactions: Sample.Reactions(plusOne: 2))]);
+        ConversationViewModel viewModel = Create(api, reactions: reactions);
+        await viewModel.LoadCommand.ExecuteAsync("octocat/hello#7");
+
+        await viewModel.ReactAsync(viewModel.Comments[1], ReactionContent.PlusOne);
+
+        await Assert.That(viewModel.Comments[1].ReactionSummary).IsEqualTo("\U0001F44D 2");
+        await Assert.That(viewModel.ErrorMessage).IsNotNull();
     }
 }

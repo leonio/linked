@@ -3,6 +3,7 @@ using Guit.Api.Auth;
 using Guit.Api.Http;
 using Guit.Api.Issues;
 using Guit.Api.Notifications;
+using Guit.Api.Reactions;
 using Guit.Api.Users;
 using Guit.Core.Services;
 using Refit;
@@ -53,7 +54,10 @@ internal static class Sample
             "<p>Please <strong>review</strong></p>",
             PullRequest: isPullRequest ? new IssuePullRequestRef("https://github.com/octocat/hello/pull/7") : null);
 
-    public static IssueComment Comment(long id, string body = "Looks good", string? association = "MEMBER", bool deletedUser = false)
+    public static ReactionRollup Reactions(int plusOne = 0, int heart = 0, int rocket = 0)
+        => new(plusOne + heart + rocket, plusOne, 0, 0, 0, heart, 0, 0, rocket);
+
+    public static IssueComment Comment(long id, string body = "Looks good", string? association = "MEMBER", bool deletedUser = false, ReactionRollup? reactions = null)
         => new(
             id,
             Now.AddHours(-3),
@@ -61,7 +65,8 @@ internal static class Sample
             deletedUser ? null : Octocat,
             body,
             "<p>" + body + "</p>",
-            association);
+            association,
+            reactions);
 
     public static IssueComment[] Comments(int count, long firstId = 1)
     {
@@ -276,5 +281,31 @@ internal sealed class FakeIssuesApi(Issue issue, params IssueComment[][] pages) 
 
         FailNextWith = null;
         return Failure.Status(status);
+    }
+}
+
+internal sealed class FakeReactionsApi : IReactionsApi
+{
+    public HttpStatusCode? FailNextWith { get; set; }
+
+    /// <summary>"issue:7:heart" or "comment:11:+1" for each call.</summary>
+    public List<string> Calls { get; } = [];
+
+    public Task CreateForIssueAsync(string owner, string repo, int issueNumber, CreateReactionRequest request, CancellationToken cancellationToken)
+        => Record($"issue:{issueNumber}:{request.Content}");
+
+    public Task CreateForIssueCommentAsync(string owner, string repo, long commentId, CreateReactionRequest request, CancellationToken cancellationToken)
+        => Record($"comment:{commentId}:{request.Content}");
+
+    private Task Record(string call)
+    {
+        Calls.Add(call);
+        if (FailNextWith is not { } status)
+        {
+            return Task.CompletedTask;
+        }
+
+        FailNextWith = null;
+        return Task.FromException(Failure.Status(status));
     }
 }

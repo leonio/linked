@@ -1,5 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
+using System.Text;
 using Guit.Api.Issues;
+using Guit.Api.Reactions;
 using Guit.Api.Users;
 using Guit.Core.Text;
 
@@ -8,8 +10,19 @@ namespace Guit.Core.Models;
 /// <summary>One post in a conversation: the opening post of the issue, or a comment.</summary>
 public sealed partial class CommentItem : ObservableObject
 {
-    private CommentItem(long id, bool isOpeningPost, GitHubUser? user, string? body, string? association, DateTimeOffset createdAt, DateTimeOffset now)
+    // Same order as ReactionContent.All.
+    private static readonly string[] Emoji = ["\U0001F44D", "\U0001F44E", "\U0001F604", "\U0001F389", "\U0001F615", "\u2764\uFE0F", "\U0001F680", "\U0001F440"];
+
+    private readonly int[] _reactionCounts = new int[8];
+
+    private CommentItem(long id, bool isOpeningPost, GitHubUser? user, string? body, string? association, ReactionRollup? reactions, DateTimeOffset createdAt, DateTimeOffset now)
     {
+        if (reactions is not null)
+        {
+            _reactionCounts = [reactions.PlusOne, reactions.MinusOne, reactions.Laugh, reactions.Hooray, reactions.Confused, reactions.Heart, reactions.Rocket, reactions.Eyes];
+        }
+
+        ReactionSummary = BuildSummary();
         Id = id;
         IsOpeningPost = isOpeningPost;
 
@@ -37,15 +50,56 @@ public sealed partial class CommentItem : ObservableObject
     /// <summary>"member", "owner", "contributor"... or null when the author has no special relation to the repository.</summary>
     public string? Association { get; }
 
+    /// <summary>The non-zero reaction counts as one line, for example "👍 3  ❤️ 1". Empty when there are none.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasReactions))]
+    public partial string ReactionSummary { get; private set; }
+
+    public bool HasReactions => ReactionSummary.Length > 0;
+
+    /// <summary>Changes one reaction count by <paramref name="delta"/> and rebuilds the summary. Unknown names are ignored.</summary>
+    public void AdjustReaction(string content, int delta)
+    {
+        for (int i = 0; i < ReactionContent.All.Count; i++)
+        {
+            if (ReactionContent.All[i] == content)
+            {
+                _reactionCounts[i] = Math.Max(0, _reactionCounts[i] + delta);
+                ReactionSummary = BuildSummary();
+                return;
+            }
+        }
+    }
+
+    private string BuildSummary()
+    {
+        StringBuilder? summary = null;
+        for (int i = 0; i < _reactionCounts.Length; i++)
+        {
+            if (_reactionCounts[i] > 0)
+            {
+                summary ??= new StringBuilder();
+                if (summary.Length > 0)
+                {
+                    summary.Append("  ");
+                }
+
+                summary.Append(Emoji[i]).Append(' ').Append(_reactionCounts[i]);
+            }
+        }
+
+        return summary?.ToString() ?? string.Empty;
+    }
+
     public static CommentItem From(IssueComment comment, DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(comment);
-        return new CommentItem(comment.Id, false, comment.User, comment.BodyText, comment.AuthorAssociation, comment.CreatedAt, now);
+        return new CommentItem(comment.Id, false, comment.User, comment.BodyText, comment.AuthorAssociation, comment.Reactions, comment.CreatedAt, now);
     }
 
     public static CommentItem FromIssue(Issue issue, DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(issue);
-        return new CommentItem(issue.Id, true, issue.User, issue.BodyText, null, issue.CreatedAt, now);
+        return new CommentItem(issue.Id, true, issue.User, issue.BodyText, null, issue.Reactions, issue.CreatedAt, now);
     }
 }
