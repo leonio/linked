@@ -1,5 +1,7 @@
+using Guit.Core.Models;
 using Guit.Core.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Navigation;
 using System.Collections.Specialized;
@@ -43,6 +45,17 @@ public sealed partial class ConversationPage : Page
         if (e.Action == NotifyCollectionChangedAction.Add && ViewModel.IsSending && ViewModel.Comments.Count > 0)
         {
             List.ScrollIntoView(ViewModel.Comments[^1]);
+        }
+    }
+
+    // x:Bind inside a DataTemplate cannot reach the page's view model, so reactions come through here.
+    // ReactAsync reports its own failures through ErrorMessage, which is what makes async void safe here.
+    private async void OnReactClick(object sender, RoutedEventArgs e)
+    {
+        MenuFlyoutItem choice = (MenuFlyoutItem)sender;
+        if (choice.CommandParameter is CommentItem item && choice.Tag is string content)
+        {
+            await ViewModel.ReactAsync(item, content);
         }
     }
 }
