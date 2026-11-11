@@ -97,6 +97,7 @@
               <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
             <Image
+                AutomationProperties.AccessibilityView="Raw"
                 Width="24"
                 Height="24"
                 x:Phase="1"

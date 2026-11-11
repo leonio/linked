@@ -22,9 +22,10 @@
           VerticalAlignment="Top"
           AutomationProperties.Name="Back"
           Command="{x:Bind ViewModel.GoBackCommand}"
-          ToolTipService.ToolTip="Back (Alt+Left)">
+          ToolTipService.ToolTip="Back (Alt+Left or Esc)">
         <Button.KeyboardAccelerators>
           <KeyboardAccelerator Key="Left" Modifiers="Menu" />
+          <KeyboardAccelerator Key="Escape" />
         </Button.KeyboardAccelerators>
         <FontIcon FontSize="16" Glyph="&#xE72B;" />
       </Button>

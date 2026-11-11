@@ -87,6 +87,7 @@
                 Style="{StaticResource CaptionTextBlockStyle}"
                 Text="{x:Bind Updated}" />
             <Image
+                AutomationProperties.AccessibilityView="Raw"
                 Grid.Column="3"
                 Width="20"
                 Height="20"

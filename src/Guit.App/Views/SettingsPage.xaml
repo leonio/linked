@@ -26,6 +26,7 @@
         <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="Account" />
         <StackPanel Orientation="Horizontal" Spacing="12">
           <Image
+                AutomationProperties.AccessibilityView="Raw"
               Width="32"
               Height="32"
               Source="{x:Bind xaml:Bind.Image(ViewModel.Shell.AvatarUrl, 32), Mode=OneWay}" />

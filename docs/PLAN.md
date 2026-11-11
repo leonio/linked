@@ -75,7 +75,7 @@ one layer, one or two files plus tests, a worked example to copy.
 - [ ] 5.1 **[S]** Start-up time measured in CI, with a budget that fails the build
 - [x] 5.2 **[S]** Conditional requests (ETag / `Last-Modified`, `X-Poll-Interval`) for polling
 - [x] 5.3 Settings page: theme, account, about
-- [ ] 5.4 Keyboard and accessibility pass
+- [x] 5.4 Keyboard and accessibility pass
 - [ ] 5.5 ARM64 build in CI
 - [ ] 5.6 **[S][H]** MSIX packaging and signing
 - [ ] 5.7 **[S]** Move to .NET 11 and CsWinRT 3 when both are stable; compare size and start-up
