@@ -84,6 +84,8 @@ Check(jobsViewModel is { Title: "Fix it", StatusKind: "running", Jobs: [{ Name: 
 JobLogViewModel jobLog = provider.GetRequiredService<JobLogViewModel>();
 await jobLog.LoadCommand.ExecuteAsync("octocat/hello@399444496\tbuild");
 Check(jobLog is { Title: "build", Lines: ["hello"] }, "job log view model");
+PullFile[] changed = await provider.GetRequiredService<IPullsApi>().ListFilesAsync("octocat", "hello", 7, 1, 100, CancellationToken.None);
+Check(changed is [{ Filename: "src/a.cs", Additions: 1, Patch: not null }], "pulls api: list files");
 
 InboxViewModel inbox = provider.GetRequiredService<InboxViewModel>();
 await inbox.LoadCommand.ExecuteAsync(null);
@@ -183,6 +185,7 @@ internal sealed class CannedHandler : HttpMessageHandler
             "/repos/octocat/hello/actions/runs/30433642" when authorized => """{"id":30433642,"name":"CI","display_title":"Fix it","run_number":12,"event":"push","status":"in_progress","conclusion":null,"head_branch":"main","created_at":"2026-01-02T00:00:00Z","updated_at":"2026-01-02T00:01:00Z","html_url":"https://github.com/octocat/hello/actions/runs/30433642"}""",
             "/repos/octocat/hello/actions/runs/30433642/jobs" when authorized => """{"total_count":1,"jobs":[{"id":399444496,"name":"build","status":"completed","conclusion":"success","started_at":"2026-01-02T00:00:10Z","completed_at":"2026-01-02T00:02:15Z","html_url":"https://github.com/octocat/hello/actions/runs/30433642/job/399444496","steps":[{"name":"Build","status":"completed","conclusion":"success","number":1,"started_at":"2026-01-02T00:00:10Z","completed_at":"2026-01-02T00:02:15Z"}]}]}""",
             "/repos/octocat/hello/actions/runs/30433642/rerun" when authorized && request.Method == HttpMethod.Post => "{}",
+            "/repos/octocat/hello/pulls/7/files" when authorized => """[{"filename":"src/a.cs","status":"modified","additions":1,"deletions":1,"patch":"@@ -1,2 +1,2 @@\n line\n-old\n+new"}]""",
             "/notifications/threads/1" when authorized => string.Empty,
             _ => null,
         };

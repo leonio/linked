@@ -383,7 +383,23 @@ internal sealed class FakeReactionsApi : IReactionsApi
 
 internal sealed class FakePullsApi(PullRequest? pull = null) : IPullsApi
 {
+    private readonly Queue<PullFile[]> _filePages = new();
+
+    public HttpStatusCode? FailNextWith { get; set; }
+
     public int Calls { get; private set; }
+
+    public List<(string Owner, string Repo, int Number, int Page)> FileCalls { get; } = [];
+
+    public FakePullsApi WithFiles(params PullFile[][] pages)
+    {
+        foreach (PullFile[] page in pages)
+        {
+            _filePages.Enqueue(page);
+        }
+
+        return this;
+    }
 
     public Task<PullRequest> GetAsync(string owner, string repo, int pullNumber, CancellationToken cancellationToken)
     {
@@ -391,6 +407,18 @@ internal sealed class FakePullsApi(PullRequest? pull = null) : IPullsApi
         return pull is null
             ? Task.FromException<PullRequest>(Failure.Status(HttpStatusCode.BadGateway))
             : Task.FromResult(pull);
+    }
+
+    public Task<PullFile[]> ListFilesAsync(string owner, string repo, int pullNumber, int page, int perPage, CancellationToken cancellationToken)
+    {
+        FileCalls.Add((owner, repo, pullNumber, page));
+        if (FailNextWith is { } status)
+        {
+            FailNextWith = null;
+            return Task.FromException<PullFile[]>(Failure.Status(status));
+        }
+
+        return Task.FromResult(_filePages.Count > 0 ? _filePages.Dequeue() : []);
     }
 }
 

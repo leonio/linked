@@ -37,6 +37,7 @@ namespace Guit.Api;
 // Notifications
 [JsonSerializable(typeof(NotificationThread[]))]
 // Pulls
+[JsonSerializable(typeof(PullFile[]))]
 [JsonSerializable(typeof(PullRequest))]
 // Reactions
 [JsonSerializable(typeof(CreateReactionRequest))]

@@ -27,4 +27,24 @@ public sealed class PullsApiTests
         await Assert.That(pull.Head.Label).IsEqualTo("contributor:feature");
         await Assert.That(pull.Base.Ref).IsEqualTo("main");
     }
+
+    [Test]
+    public async Task ListFiles_sends_paging_and_maps_patches()
+    {
+        using RecordingHandler http = new("""
+            [ { "sha": "abc", "filename": "src/a.cs", "status": "modified", "additions": 2, "deletions": 1, "changes": 3,
+                "patch": "@@ -1,2 +1,3 @@\n line\n-old\n+new\n+more" },
+              { "sha": "def", "filename": "docs/new.png", "status": "added", "additions": 0, "deletions": 0, "changes": 0 },
+              { "sha": "ghi", "filename": "src/b.cs", "status": "renamed", "additions": 0, "deletions": 0, "changes": 0, "previous_filename": "src/old.cs" } ]
+            """);
+
+        PullFile[] files = await Stub.Client<IPullsApi>(http).ListFilesAsync("o", "r", 7, page: 2, perPage: 100, CancellationToken.None);
+
+        await Assert.That(http.Path).IsEqualTo("/repos/o/r/pulls/7/files?page=2&per_page=100");
+        await Assert.That(files.Length).IsEqualTo(3);
+        await Assert.That(files[0].Patch).IsEqualTo("@@ -1,2 +1,3 @@\n line\n-old\n+new\n+more");
+        await Assert.That(files[0].Additions).IsEqualTo(2);
+        await Assert.That(files[1].Patch).IsNull();
+        await Assert.That(files[2].PreviousFilename).IsEqualTo("src/old.cs");
+    }
 }
