@@ -45,7 +45,7 @@ repository, plus manually started builds that publish versioned files of both ap
 
 | Piece | State |
 |---|---|
-| `rust/guit-core` | GitHub client over a `Transport` trait; device flow; relative time; subject links; the inbox state model (paging, filters, kind filter with top-up, optimistic actions, change-free refresh); pull request and comment rows; Actions rows, durations and the log cleaner. No Windows dependency. 47 tests, run on Linux in CI. |
+| `rust/guit-core` | GitHub client over a `Transport` trait; device flow; relative time; subject links; the inbox state model (paging, filters, kind filter with top-up, optimistic actions, change-free refresh); pull request and comment rows; Actions rows, durations and the log cleaner. No Windows dependency. 57 tests, run on Linux in CI. Also `rich` (comment HTML to styled blocks). |
 | `rust/guit` | WinRT platform layer (`Windows.Web.Http`, credential locker, launcher, clipboard) and one reactor component with three sections. **Inbox**: Unread/All/Participating, kind box, mark as done, Load more, a refresh every minute. **Pull requests**: three scopes. **Conversations**: opening post and comments as plain text, reply box. **Actions**: repository box, runs, a run's jobs and steps that follow a live run, re-run, job log. Files: `main.rs` (state, messages, update, sign-in and inbox views), `pulls.rs`, `actions.rs`, `platform.rs`. |
 | CI (`ci.yml`, job `rust`) | Builds the release exe for x64 and ARM64, stages it with its runtime files (`tools/stage-rust.ps1`), launches it and times start-up with `tools/measure-startup.ps1`, the same script the C# job uses. Green. |
 | Manual builds (`release.yml`) | Run from the Actions tab with a `version`. Builds both apps at one commit for x64 and ARM64 and uploads `guit-cs-<version>-<rid>.zip` and `guit-rs-<version>-<rid>.zip`, each with the app, `measure-startup.ps1` and a README. Ticking `publish_release` also creates a GitHub Release tagged `v<version>`. Run once with 0.1.0 (artifacts only): green. |
@@ -56,11 +56,13 @@ signed out. Everything type-checks for Windows.
 **Not verified**: nobody has signed in with the Rust app, so none of its pages has been seen with data (plan
 card 6.6). The UI code was written from the reactor samples. Expect layout and behaviour fixes on first real use.
 The pull requests, conversation and Actions pages were pushed on 11 November 2026 while GitHub was not starting
-CI runs for this repository (runs stayed "queued" with no jobs), so check the latest run before trusting them.
+CI runs for this repository (an Actions outage, and the account then ran out of build minutes; the owner said to
+ignore CI for now). They type-check for Windows but have never been linked or launched, so check a CI run once
+minutes are available before trusting them.
 The `publish_release` path of `release.yml` has not been exercised either.
 
-Known gaps against the C# app: comments are plain text (no formatting, reactions, pull request header or
-Files changed), conversations show the first 100 comments, the inbox loads more by button instead of on scroll
+Known gaps against the C# app: comments are formatted but reactor's rich text has no monospace, strikethrough or
+indent yet (they are approximated with characters); there are no reactions, pull request header or Files changed; conversations show the first 100 comments, the inbox loads more by button instead of on scroll
 and polls unconditionally, and there is no settings page or keyboard shortcut set.
 
 ### Facts worth knowing
@@ -83,7 +85,7 @@ and polls unconditionally, and there is no settings page or keyboard shortcut se
 
 ### Next steps
 
-Plan cards 6.6, 6.8b and 6.10 in `docs/PLAN.md`: get the owner to try the Rust app signed in and fix what that
+Plan cards 6.6, 6.8c and 6.10 in `docs/PLAN.md`: get the owner to try the Rust app signed in and fix what that
 shows; bring conversations to parity (formatted comments, reactions, pull request header, Files changed);
 then measure the signed-in scenarios on one machine. Add a `rust` skill under `.claude/skills/` once a second
 page has proven the patterns. Repeat the ARM64 measurement: C# start-up there varied from 153 to 416 ms in one run.

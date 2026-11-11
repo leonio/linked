@@ -5,6 +5,7 @@ use std::rc::Rc;
 
 use guit_core::conversation::{CommentItem, PullRequestItem, PullRequestScope};
 use guit_core::link::SubjectLink;
+use guit_core::rich::{Block, BlockKind};
 use windows_reactor::*;
 
 use crate::{Guit, Message, error_bar};
@@ -266,10 +267,59 @@ fn comment_card(comment: &CommentItem) -> View {
                         .opacity(0.7)
                         .vertical_alignment(VerticalAlignment::Center),
                 )),
-            TextBlock::new()
-                .text(comment.body.as_str())
+            RichTextBlock::new()
+                .paragraphs(rich_text(&comment.content))
                 .text_wrapping(TextWrapping::Wrap)
                 .is_text_selection_enabled(true),
         ))
         .into()
+}
+
+/// Turns a comment's blocks into reactor's rich text. Reactor's runs carry bold, italic and links; what it has no
+/// property for yet is shown with characters instead: a bar for quotes, wide spaces for nesting, a line for rules.
+/// Code keeps its text but not a monospace font.
+fn rich_text(blocks: &[Block]) -> RichText {
+    RichText::new(blocks.iter().map(|block| {
+        let mut inlines = Vec::new();
+        let mut lead = "\u{2003}\u{2003}".repeat(usize::from(block.indent));
+        if block.is_quote {
+            lead.push_str("\u{258E} ");
+        }
+        if !lead.is_empty() {
+            inlines.push(RichTextInline::Run(RichTextRun::plain(lead)));
+        }
+
+        if block.kind == BlockKind::Rule {
+            inlines.push(RichTextInline::Run(RichTextRun::plain(
+                "\u{2015}".repeat(12),
+            )));
+        }
+
+        let heading = block.kind == BlockKind::Heading;
+        for inline in &block.inlines {
+            // Each '\n' becomes a line break; the text between them becomes a run or a link.
+            for (index, line) in inline.text.split('\n').enumerate() {
+                if index > 0 {
+                    inlines.push(RichTextInline::LineBreak);
+                }
+                if line.is_empty() {
+                    continue;
+                }
+
+                inlines.push(match &inline.link {
+                    Some(uri) => RichTextInline::Hyperlink(RichTextHyperlink {
+                        text: line.to_string(),
+                        uri: uri.clone(),
+                    }),
+                    None => RichTextInline::Run(RichTextRun {
+                        text: line.to_string(),
+                        is_bold: inline.bold || heading,
+                        is_italic: inline.italic || block.is_quote,
+                    }),
+                });
+            }
+        }
+
+        RichTextParagraph::new(inlines)
+    }))
 }

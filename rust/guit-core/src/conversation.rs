@@ -3,6 +3,7 @@
 use crate::api::{Issue, IssueComment, IssueSearchItem, User};
 use crate::inbox::small_avatar;
 use crate::link::SubjectLink;
+use crate::rich::{self, Block};
 use crate::time;
 
 /// Which of the member's open pull requests to list.
@@ -85,7 +86,10 @@ pub struct CommentItem {
     pub is_opening_post: bool,
     pub author: String,
     pub avatar_url: String,
+    /// The post as plain text.
     pub body: String,
+    /// The post with its formatting, parsed once here so the view only walks ready-made blocks.
+    pub content: Vec<Block>,
     pub posted: String,
     /// "member", "owner", "contributor"... or `None` when the author has no special relation to the repository.
     pub association: Option<String>,
@@ -99,6 +103,7 @@ impl CommentItem {
             author: author(issue.user.as_ref()),
             avatar_url: avatar(issue.user.as_ref()),
             body: issue.body_text.clone().unwrap_or_default(),
+            content: content(issue.body_html.as_deref(), issue.body_text.as_deref()),
             posted: age(&issue.created_at, now),
             association: None,
         }
@@ -111,6 +116,7 @@ impl CommentItem {
             author: author(comment.user.as_ref()),
             avatar_url: avatar(comment.user.as_ref()),
             body: comment.body_text.clone().unwrap_or_default(),
+            content: content(comment.body_html.as_deref(), comment.body_text.as_deref()),
             posted: age(&comment.created_at, now),
             association: comment
                 .author_association
@@ -118,6 +124,13 @@ impl CommentItem {
                 .filter(|association| *association != "NONE")
                 .map(|association| association.to_lowercase().replace('_', " ")),
         }
+    }
+}
+
+fn content(html: Option<&str>, text: Option<&str>) -> Vec<Block> {
+    match html.filter(|html| !html.is_empty()) {
+        Some(html) => rich::parse_html(html),
+        None => rich::from_plain_text(text.unwrap_or_default()),
     }
 }
 
@@ -200,6 +213,7 @@ mod tests {
             created_at: "2026-06-13T12:00:00Z".into(),
             user: Some(octocat()),
             body_text: Some("Please review".into()),
+            body_html: Some("<p>Please <strong>review</strong></p>".into()),
             pull_request: None,
         };
         let comment = IssueComment {
@@ -207,6 +221,7 @@ mod tests {
             created_at: "2026-06-15T09:00:00Z".into(),
             user: None,
             body_text: None,
+            body_html: None,
             author_association: Some("FIRST_TIME_CONTRIBUTOR".into()),
         };
 
@@ -223,6 +238,9 @@ mod tests {
             ("octocat", "Please review", "2d")
         );
         assert_eq!(opening.avatar_url, "https://avatars/1?s=64");
+        assert!(opening.content[0].inlines[1].bold);
+        assert_eq!(opening.content[0].inlines[1].text, "review");
+        assert!(reply.content.is_empty());
         assert_eq!((reply.author.as_str(), reply.body.as_str()), ("ghost", ""));
         assert_eq!(reply.association.as_deref(), Some("first time contributor"));
 

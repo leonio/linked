@@ -11,6 +11,7 @@ pub mod device_flow;
 pub mod http;
 pub mod inbox;
 pub mod link;
+pub mod rich;
 pub mod time;
 
 /// The OAuth App client id. Public, not a secret; the same app the C# client signs in with.

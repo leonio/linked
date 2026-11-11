@@ -94,7 +94,8 @@ The same app on windows-rs and windows-reactor, to compare with the C# app. It r
 - [ ] 6.6 **[H]** Run the Rust app signed in on a real machine; nobody has seen its inbox yet
 - [x] 6.7 Inbox parity: paging ("Load more"), filters, kind filter, mark as done, background refresh (unconditional for now)
 - [x] 6.8 Pull requests page; conversations as plain text with a reply box (first 100 comments)
-- [ ] 6.8b Conversation parity: formatted comments, reactions, pull request header, Files changed, comment paging
+- [x] 6.8b Formatted comments: `guit_core::rich` (a port of the C# HTML parser) drawn with reactor's rich text
+- [ ] 6.8c Conversation parity, the rest: reactions, pull request header, Files changed, comment paging
 - [x] 6.9 Actions pages: runs per repository, jobs with steps, self-updating while live, re-run, job log
 - [ ] 6.10 **[S]** Measure the signed-in scenarios on one machine: time to a filled inbox, memory, scrolling
 

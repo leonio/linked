@@ -145,6 +145,8 @@ pub struct Issue {
     pub user: Option<User>,
     /// The body as plain text. Present because requests ask for the "full" media type.
     pub body_text: Option<String>,
+    /// The body as GitHub renders it. Also from the "full" media type.
+    pub body_html: Option<String>,
     /// Present (whatever its content) when this issue is a pull request.
     pub pull_request: Option<serde_json::Value>,
 }
@@ -156,6 +158,7 @@ pub struct IssueComment {
     pub created_at: String,
     pub user: Option<User>,
     pub body_text: Option<String>,
+    pub body_html: Option<String>,
     pub author_association: Option<String>,
 }
 
