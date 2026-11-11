@@ -29,6 +29,9 @@ jobs:
         run: dotnet publish tests/Guit.AotSmoke -c Release -r linux-x64
       - name: Run AOT smoke
         run: ./artifacts/publish/Guit.AotSmoke/release_linux-x64/Guit.AotSmoke
+      - name: Test the Rust core
+        working-directory: rust
+        run: cargo test -p guit-core --locked
 
   app:
     name: WinUI app ${{ matrix.rid }} (build, Native AOT publish, launch)
@@ -66,3 +69,48 @@ jobs:
           name: Guit-${{ matrix.rid }}
           path: artifacts/publish/Guit.App/
           if-no-files-found: error
+
+  rust:
+    name: Rust app ${{ matrix.rid }} (build, launch)
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - rid: win-x64
+            target: x86_64-pc-windows-msvc
+            os: windows-latest
+          - rid: win-arm64
+            target: aarch64-pc-windows-msvc
+            os: windows-11-arm
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install the Rust target
+        run: |
+          rustup update stable --no-self-update
+          rustup default stable
+          rustup target add ${{ matrix.target }}
+      # The release profile uses fat LTO over the windows crate: slow from cold, quick from cache.
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: rust-${{ matrix.target }}-${{ hashFiles('rust/Cargo.lock', 'rust/Cargo.toml') }}
+      - name: Build
+        working-directory: rust
+        run: cargo build --release -p guit --locked --target ${{ matrix.target }}
+      - name: Stage
+        shell: pwsh
+        run: ./tools/stage-rust.ps1 -BuildDir rust/target/${{ matrix.target }}/release -Out artifacts/guit-rs
+      # No budget yet: the first runs establish what normal is. Same script and method as the C# job.
+      - name: Launch and time start-up (the exe must start and show a window)
+        shell: pwsh
+        run: ./tools/measure-startup.ps1 -Exe artifacts/guit-rs/guit.exe -Label "Rust ${{ matrix.rid }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Guit-rs-${{ matrix.rid }}
+          path: artifacts/guit-rs/
+          if-no-files-found: error
+
