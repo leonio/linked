@@ -69,8 +69,13 @@ WorkflowRunList runs = await actions.ListRunsAsync("octocat", "hello", 1, 30, Ca
 Check(runs is { TotalCount: 1, WorkflowRuns: [{ Id: 30433642, Conclusion: null, Status: "in_progress" }] }, "actions api: list runs");
 JobList jobs = await actions.ListJobsAsync("octocat", "hello", 30433642, 1, 100, CancellationToken.None);
 Check(jobs is { Jobs: [{ Name: "build", Conclusion: "success", CompletedAt: not null }] }, "actions api: list jobs");
+WorkflowRun oneRun = await actions.GetRunAsync("octocat", "hello", 30433642, CancellationToken.None);
+Check(oneRun is { RunNumber: 12, Name: "CI" }, "actions api: get run");
 await actions.RerunAsync("octocat", "hello", 30433642, CancellationToken.None);
 Check(true, "actions api: rerun");
+RunsViewModel runsViewModel = provider.GetRequiredService<RunsViewModel>();
+await runsViewModel.LoadRepositoriesCommand.ExecuteAsync(null);
+Check(runsViewModel is { SelectedRepository: "octocat/hello", Runs: [{ StatusKind: "running", Detail: "CI #12 \u00B7 push \u00B7 main" }] }, "runs view model");
 
 InboxViewModel inbox = provider.GetRequiredService<InboxViewModel>();
 await inbox.LoadCommand.ExecuteAsync(null);
@@ -167,6 +172,7 @@ internal sealed class CannedHandler : HttpMessageHandler
             "/search/issues" when authorized => """{"total_count":1,"incomplete_results":false,"items":[{"id":70,"number":7,"title":"Fix it","state":"open","comments":2,"updated_at":"2026-01-02T00:00:00Z","html_url":"https://github.com/octocat/hello/pull/7","repository_url":"https://api.github.com/repos/octocat/hello","user":{"login":"octocat","id":583231,"avatar_url":"https://avatars/1","html_url":"https://github.com/octocat"},"draft":false}]}""",
             "/user/repos" when authorized => """[{"id":9,"name":"hello","full_name":"octocat/hello","private":false,"html_url":"https://github.com/octocat/hello","owner":{"login":"octocat","id":583231,"avatar_url":"https://avatars/1","html_url":"https://github.com/octocat"}}]""",
             "/repos/octocat/hello/actions/runs" when authorized => """{"total_count":1,"workflow_runs":[{"id":30433642,"name":"CI","display_title":"Fix it","run_number":12,"event":"push","status":"in_progress","conclusion":null,"head_branch":"main","created_at":"2026-01-02T00:00:00Z","updated_at":"2026-01-02T00:01:00Z","html_url":"https://github.com/octocat/hello/actions/runs/30433642","actor":{"login":"octocat","id":583231,"avatar_url":"https://avatars/1","html_url":"https://github.com/octocat"}}]}""",
+            "/repos/octocat/hello/actions/runs/30433642" when authorized => """{"id":30433642,"name":"CI","display_title":"Fix it","run_number":12,"event":"push","status":"in_progress","conclusion":null,"head_branch":"main","created_at":"2026-01-02T00:00:00Z","updated_at":"2026-01-02T00:01:00Z","html_url":"https://github.com/octocat/hello/actions/runs/30433642"}""",
             "/repos/octocat/hello/actions/runs/30433642/jobs" when authorized => """{"total_count":1,"jobs":[{"id":399444496,"name":"build","status":"completed","conclusion":"success","started_at":"2026-01-02T00:00:10Z","completed_at":"2026-01-02T00:02:15Z","html_url":"https://github.com/octocat/hello/actions/runs/30433642/job/399444496"}]}""",
             "/repos/octocat/hello/actions/runs/30433642/rerun" when authorized && request.Method == HttpMethod.Post => "{}",
             "/notifications/threads/1" when authorized => string.Empty,

@@ -24,6 +24,7 @@ namespace Guit.Api;
     DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
 // Actions
 [JsonSerializable(typeof(JobList))]
+[JsonSerializable(typeof(WorkflowRun))]
 [JsonSerializable(typeof(WorkflowRunList))]
 // Auth
 [JsonSerializable(typeof(DeviceCode))]

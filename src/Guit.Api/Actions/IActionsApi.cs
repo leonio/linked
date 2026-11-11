@@ -11,6 +11,10 @@ public interface IActionsApi
     [Get("/repos/{owner}/{repo}/actions/runs")]
     Task<WorkflowRunList> ListRunsAsync(string owner, string repo, int page, [AliasAs("per_page")] int perPage, CancellationToken cancellationToken);
 
+    /// <summary>operationId: actions/get-workflow-run</summary>
+    [Get("/repos/{owner}/{repo}/actions/runs/{runId}")]
+    Task<WorkflowRun> GetRunAsync(string owner, string repo, long runId, CancellationToken cancellationToken);
+
     /// <summary>operationId: actions/list-jobs-for-workflow-run. Jobs of the latest attempt.</summary>
     [Get("/repos/{owner}/{repo}/actions/runs/{runId}/jobs")]
     Task<JobList> ListJobsAsync(string owner, string repo, long runId, int page, [AliasAs("per_page")] int perPage, CancellationToken cancellationToken);

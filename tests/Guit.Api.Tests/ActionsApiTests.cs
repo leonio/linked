@@ -74,4 +74,16 @@ public sealed class ActionsApiTests
         await Assert.That(http.Path).IsEqualTo("/repos/o/r/actions/runs/30433642/rerun");
         await Assert.That(string.IsNullOrEmpty(http.Body)).IsTrue();
     }
+
+    [Test]
+    public async Task GetRun_maps_one_run()
+    {
+        using RecordingHandler http = new("""{"id":30433642,"name":"CI","display_title":"Fix it","run_number":12,"event":"push","status":"completed","conclusion":"success","head_branch":"main","created_at":"2026-01-02T00:00:00Z","updated_at":"2026-01-02T00:05:00Z","html_url":"https://github.com/o/r/actions/runs/30433642"}""");
+
+        WorkflowRun run = await Stub.Client<IActionsApi>(http).GetRunAsync("o", "r", 30433642, CancellationToken.None);
+
+        await Assert.That(http.Path).IsEqualTo("/repos/o/r/actions/runs/30433642");
+        await Assert.That(run.RunNumber).IsEqualTo(12);
+        await Assert.That(run.Conclusion).IsEqualTo("success");
+    }
 }

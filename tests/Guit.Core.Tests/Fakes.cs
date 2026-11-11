@@ -412,3 +412,92 @@ internal sealed class FakeSearchApi(params IssueSearchItem[][] pages) : ISearchA
         return Task.FromResult(new IssueSearchResult(items.Length, false, items));
     }
 }
+
+internal sealed class FakeReposApi(params string[] fullNames) : IReposApi
+{
+    public HttpStatusCode? FailNextWith { get; set; }
+
+    public int Calls { get; private set; }
+
+    public Task<RepositorySummary[]> ListMineAsync(string sort, int page, int perPage, CancellationToken cancellationToken)
+    {
+        Calls++;
+        if (FailNextWith is { } status)
+        {
+            FailNextWith = null;
+            return Task.FromException<RepositorySummary[]>(Failure.Status(status));
+        }
+
+        RepositorySummary[] repositories = new RepositorySummary[fullNames.Length];
+        for (int i = 0; i < fullNames.Length; i++)
+        {
+            string name = fullNames[i][(fullNames[i].IndexOf('/', StringComparison.Ordinal) + 1)..];
+            repositories[i] = new RepositorySummary(i + 1, name, fullNames[i], false, "https://github.com/" + fullNames[i], Sample.Octocat);
+        }
+
+        return Task.FromResult(repositories);
+    }
+}
+
+/// <summary>Returns queued run pages in order, one run for GetRun, and a fixed job list; records every call.</summary>
+internal sealed class FakeActionsApi(params WorkflowRun[][] runPages) : IActionsApi
+{
+    private readonly Queue<WorkflowRun[]> _runPages = new(runPages);
+
+    public HttpStatusCode? FailNextWith { get; set; }
+
+    public WorkflowRun Run { get; set; } = Sample.Run(12, "completed", "failure");
+
+    public Job[] Jobs { get; set; } = [];
+
+    public List<(string Owner, string Repo, int Page)> RunCalls { get; } = [];
+
+    public List<(string Owner, string Repo, long RunId)> JobCalls { get; } = [];
+
+    public List<long> Reruns { get; } = [];
+
+    public Task<WorkflowRunList> ListRunsAsync(string owner, string repo, int page, int perPage, CancellationToken cancellationToken)
+    {
+        RunCalls.Add((owner, repo, page));
+        if (TakeFailure() is { } failure)
+        {
+            return Task.FromException<WorkflowRunList>(failure);
+        }
+
+        WorkflowRun[] runs = _runPages.Count > 0 ? _runPages.Dequeue() : [];
+        return Task.FromResult(new WorkflowRunList(runs.Length, runs));
+    }
+
+    public Task<WorkflowRun> GetRunAsync(string owner, string repo, long runId, CancellationToken cancellationToken)
+        => TakeFailure() is { } failure ? Task.FromException<WorkflowRun>(failure) : Task.FromResult(Run);
+
+    public Task<JobList> ListJobsAsync(string owner, string repo, long runId, int page, int perPage, CancellationToken cancellationToken)
+    {
+        JobCalls.Add((owner, repo, runId));
+        return TakeFailure() is { } failure
+            ? Task.FromException<JobList>(failure)
+            : Task.FromResult(new JobList(Jobs.Length, Jobs));
+    }
+
+    public Task RerunAsync(string owner, string repo, long runId, CancellationToken cancellationToken)
+    {
+        if (TakeFailure() is { } failure)
+        {
+            return Task.FromException(failure);
+        }
+
+        Reruns.Add(runId);
+        return Task.CompletedTask;
+    }
+
+    private ApiException? TakeFailure()
+    {
+        if (FailNextWith is not { } status)
+        {
+            return null;
+        }
+
+        FailNextWith = null;
+        return Failure.Status(status);
+    }
+}
