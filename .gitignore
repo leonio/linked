@@ -8,3 +8,4 @@ obj/
 AppPackages/
 BundleArtifacts/
 TestResults/
+rust/target/

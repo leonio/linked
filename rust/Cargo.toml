@@ -1,0 +1,29 @@
+[workspace]
+resolver = "3"
+members = ["guit-core", "guit"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.95"
+license = "MIT"
+publish = false
+
+# windows-reactor is a preview and its released API is still moving, so every windows-rs crate is
+# pinned to one commit of the repository. Change the revision in one place: here.
+[workspace.dependencies]
+windows-reactor = { git = "https://github.com/microsoft/windows-rs", rev = "0cfb708" }
+windows-reactor-setup = { git = "https://github.com/microsoft/windows-rs", rev = "0cfb708" }
+windows = { git = "https://github.com/microsoft/windows-rs", rev = "0cfb708" }
+windows-core = { git = "https://github.com/microsoft/windows-rs", rev = "0cfb708" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# The shipped build: optimise for speed like the C# app does (OptimizationPreference=Speed),
+# one codegen unit and LTO so the comparison is against Rust's best, and no unwinding tables.
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = "symbols"
