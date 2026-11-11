@@ -33,6 +33,7 @@ public sealed partial class ShellView : UserControl
         Route route = (args.SelectedItem as NavigationViewItem)?.Tag switch
         {
             "pulls" => Route.PullRequests,
+            "runs" => Route.Runs,
             _ => Route.Inbox,
         };
 

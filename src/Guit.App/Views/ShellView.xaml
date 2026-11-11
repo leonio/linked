@@ -20,6 +20,7 @@
       <NavigationView.MenuItems>
         <NavigationViewItem Content="Inbox" Icon="Mail" Tag="inbox" />
         <NavigationViewItem Content="Pull requests" Icon="Switch" Tag="pulls" />
+        <NavigationViewItem Content="Actions" Icon="Play" Tag="runs" />
       </NavigationView.MenuItems>
       <NavigationView.FooterMenuItems>
         <NavigationViewItem Content="{x:Bind ViewModel.Login, Mode=OneWay}" SelectsOnInvoked="False">
