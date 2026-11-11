@@ -23,13 +23,17 @@ pub struct NotificationItem {
     pub unread: bool,
     /// Where clicking the row goes: the issue or pull request, or else the repository.
     pub web_url: String,
+    /// The issue or pull request behind the row, when it is one: those open inside the app.
+    pub link: Option<SubjectLink>,
 }
 
 impl NotificationItem {
     /// `now` is seconds since the Unix epoch.
     pub fn from_thread(thread: &NotificationThread, now: i64) -> Self {
-        let web_url = SubjectLink::parse(thread.subject.url.as_deref())
-            .map_or_else(|| thread.repository.html_url.clone(), |link| link.web_url());
+        let link = SubjectLink::parse(thread.subject.url.as_deref());
+        let web_url = link
+            .as_ref()
+            .map_or_else(|| thread.repository.html_url.clone(), SubjectLink::web_url);
         Self {
             id: thread.id.clone(),
             title: thread.subject.title.clone(),
@@ -42,6 +46,7 @@ impl NotificationItem {
                 .map_or_else(String::new, |then| time::relative(then, now)),
             unread: thread.unread,
             web_url,
+            link,
         }
     }
 }
@@ -447,6 +452,7 @@ mod tests {
         assert_eq!(item.updated, "3h");
         assert!(item.unread);
         assert_eq!(item.web_url, "https://github.com/octocat/hello/pull/7");
+        assert_eq!(item.link.unwrap().reference(), "octocat/hello #7");
     }
 
     #[test]
@@ -455,6 +461,7 @@ mod tests {
 
         assert_eq!(item.glyph, "\u{EA8F}");
         assert_eq!(item.web_url, "https://github.com/octocat/hello");
+        assert_eq!(item.link, None);
     }
 
     fn item(id: u32, kind: &str) -> NotificationItem {

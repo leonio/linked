@@ -6,15 +6,18 @@
 #![windows_subsystem = "windows"]
 
 mod platform;
+mod pulls;
 
 use std::rc::Rc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use guit_core::api::{ApiError, DeviceCode, GitHub, User};
+use guit_core::conversation::{CommentItem, PullRequestItem, PullRequestScope};
 use guit_core::device_flow::{DeviceFlowOutcome, wait_for_token};
 use guit_core::inbox::{Filter, Inbox, Kind, NotificationItem, PageRequest, Removed};
 use guit_core::{GITHUB_CLIENT_ID, GITHUB_SCOPES};
 use platform::WinRtTransport;
+use pulls::{Conversation, Pulls};
 use windows_reactor::*;
 
 /// How often the inbox checks for changes in the background.
@@ -30,7 +33,7 @@ enum Purpose {
 
 /// Everything that can happen. Messages cross threads (background work answers with one), so they own their data.
 #[derive(Clone)]
-enum Message {
+pub(crate) enum Message {
     SignIn,
     DeviceCodeReady(Result<DeviceCode, String>),
     SignInFinished(Result<DeviceFlowOutcome, String>),
@@ -54,6 +57,47 @@ enum Message {
         id: String,
         error: Option<String>,
     },
+
+    // The shell.
+    Navigate(Option<String>),
+
+    // The pull requests page.
+    ScopeSelected(PullRequestScope),
+    ReloadPulls,
+    PullsLoaded {
+        generation: u64,
+        result: Result<Vec<PullRequestItem>, ApiError>,
+    },
+    OpenPull(Option<usize>),
+
+    // The conversation page.
+    ConversationLoaded {
+        reference: String,
+        result: Result<LoadedConversation, ApiError>,
+    },
+    CloseConversation,
+    OpenConversationInBrowser,
+    DraftChanged(String),
+    SendComment,
+    CommentSent {
+        reference: String,
+        result: Result<CommentItem, ApiError>,
+    },
+}
+
+/// What a conversation load brings back.
+#[derive(Clone)]
+pub(crate) struct LoadedConversation {
+    title: String,
+    state: String,
+    comments: Vec<CommentItem>,
+}
+
+/// The sections in the navigation pane.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Section {
+    Inbox,
+    PullRequests,
 }
 
 /// The sign-in view's state.
@@ -78,6 +122,10 @@ struct Shell {
     pending_done: Vec<Removed>,
     /// The background refresh. Dropping it cancels the next tick.
     poll: Option<ComponentTimer>,
+    section: Section,
+    pulls: Pulls,
+    /// The issue or pull request being read, shown in place of the section's page.
+    conversation: Option<Conversation>,
 }
 
 enum Session {
@@ -85,7 +133,7 @@ enum Session {
     SignedIn(Shell),
 }
 
-struct Guit {
+pub(crate) struct Guit {
     session: Session,
 }
 
@@ -112,6 +160,9 @@ impl Guit {
             error: None,
             pending_done: Vec::new(),
             poll: Some(context.set_timeout(POLL_PERIOD, Message::PollTick)),
+            section: Section::Inbox,
+            pulls: Pulls::default(),
+            conversation: None,
         });
     }
 
@@ -146,6 +197,74 @@ fn fetch(context: &ComponentContext<Guit>, token: &str, request: PageRequest, pu
             result,
         }
     });
+}
+
+/// The first 100 comments are loaded in one request; longer conversations show their start.
+const COMMENT_COUNT: u32 = 100;
+
+impl Shell {
+    /// Shows an issue or pull request in the app and starts loading it.
+    fn open_conversation(
+        &mut self,
+        link: guit_core::link::SubjectLink,
+        context: &ComponentContext<Guit>,
+    ) {
+        let token = self.token.clone();
+        let (owner, repo, number, reference) = (
+            link.owner.clone(),
+            link.repo.clone(),
+            link.number,
+            link.reference(),
+        );
+        self.conversation = Some(Conversation::opening(link));
+        _ = context.spawn_background(move |_| {
+            let github = GitHub::new(&WinRtTransport);
+            let result = github
+                .issue(&token, &owner, &repo, number)
+                .and_then(|issue| {
+                    let replies =
+                        github.issue_comments(&token, &owner, &repo, number, 1, COMMENT_COUNT)?;
+                    let now = now();
+                    let mut comments = vec![CommentItem::from_issue(&issue, now)];
+                    comments.extend(
+                        replies
+                            .iter()
+                            .map(|reply| CommentItem::from_comment(reply, now)),
+                    );
+                    Ok(LoadedConversation {
+                        title: issue.title,
+                        state: issue.state,
+                        comments,
+                    })
+                });
+            Message::ConversationLoaded { reference, result }
+        });
+    }
+
+    fn load_pulls(&mut self, context: &ComponentContext<Guit>) {
+        self.pulls.generation += 1;
+        self.pulls.loading = true;
+        self.pulls.loaded = true;
+        self.pulls.error = None;
+        let (generation, token, query) = (
+            self.pulls.generation,
+            self.token.clone(),
+            self.pulls.scope.query(),
+        );
+        _ = context.spawn_background(move |_| {
+            let result = GitHub::new(&WinRtTransport)
+                .search_issues(&token, query, 1, Inbox::PAGE_SIZE)
+                .map(|found| {
+                    let now = now();
+                    found
+                        .items
+                        .iter()
+                        .map(|item| PullRequestItem::from_search(item, now))
+                        .collect()
+                });
+            Message::PullsLoaded { generation, result }
+        });
+    }
 }
 
 impl Component for Guit {
@@ -306,7 +425,11 @@ impl Component for Guit {
             },
             (Session::SignedIn(shell), Message::Open(Some(index))) => {
                 if let Some(item) = shell.inbox.visible().get(index).cloned() {
-                    platform::open_in_browser(&item.web_url);
+                    // Issues and pull requests open in the app; other kinds open the repository on github.com.
+                    match item.link.clone() {
+                        Some(link) => shell.open_conversation(link, context),
+                        None => platform::open_in_browser(&item.web_url),
+                    }
                     if item.unread {
                         shell.inbox.mark_read(&item.id);
                         let (token, id) = (shell.token.clone(), item.id.clone());
@@ -343,6 +466,114 @@ impl Component for Guit {
                     if let Some(error) = error {
                         shell.inbox.restore(removed);
                         shell.error = Some(error);
+                    }
+                }
+            }
+
+            // ---- the shell, pull requests and conversations -----------------------------------
+            (Session::SignedIn(shell), Message::Navigate(tag)) => {
+                shell.conversation = None;
+                shell.section = if tag.as_deref() == Some("pulls") {
+                    Section::PullRequests
+                } else {
+                    Section::Inbox
+                };
+                if shell.section == Section::PullRequests && !shell.pulls.loaded {
+                    shell.load_pulls(context);
+                }
+            }
+            (Session::SignedIn(shell), Message::ScopeSelected(scope))
+                if shell.pulls.scope != scope =>
+            {
+                shell.pulls.scope = scope;
+                shell.load_pulls(context);
+            }
+            (Session::SignedIn(shell), Message::ReloadPulls) => shell.load_pulls(context),
+            (Session::SignedIn(shell), Message::PullsLoaded { generation, result })
+                if generation == shell.pulls.generation =>
+            {
+                shell.pulls.loading = false;
+                match result {
+                    Ok(items) => shell.pulls.items = items,
+                    Err(error) if error.is_unauthorized() => self.sign_out(),
+                    Err(error) => shell.pulls.error = Some(error.describe()),
+                }
+            }
+            (Session::SignedIn(shell), Message::OpenPull(Some(index))) => {
+                if let Some(item) = shell.pulls.items.get(index) {
+                    match item.link.clone() {
+                        Some(link) => shell.open_conversation(link, context),
+                        None => platform::open_in_browser(&item.web_url),
+                    }
+                }
+            }
+            (Session::SignedIn(shell), Message::ConversationLoaded { reference, result }) => {
+                // The reply is for this conversation only if the member has not moved on to another.
+                if let Some(conversation) = shell
+                    .conversation
+                    .as_mut()
+                    .filter(|open| open.link.reference() == reference)
+                {
+                    conversation.loading = false;
+                    match result {
+                        Ok(loaded) => {
+                            conversation.title = loaded.title;
+                            conversation.state = loaded.state;
+                            conversation.comments = loaded.comments;
+                        }
+                        Err(error) if error.is_unauthorized() => self.sign_out(),
+                        Err(error) => conversation.error = Some(error.describe()),
+                    }
+                }
+            }
+            (Session::SignedIn(shell), Message::CloseConversation) => shell.conversation = None,
+            (Session::SignedIn(shell), Message::OpenConversationInBrowser) => {
+                if let Some(conversation) = &shell.conversation {
+                    platform::open_in_browser(&conversation.link.web_url());
+                }
+            }
+            (Session::SignedIn(shell), Message::DraftChanged(draft)) => {
+                if let Some(conversation) = &mut shell.conversation {
+                    conversation.draft = draft;
+                }
+            }
+            (Session::SignedIn(shell), Message::SendComment) => {
+                if let Some(conversation) =
+                    shell.conversation.as_mut().filter(|open| open.can_send())
+                {
+                    conversation.sending = true;
+                    conversation.error = None;
+                    let link = &conversation.link;
+                    let (token, owner, repo, number, reference) = (
+                        shell.token.clone(),
+                        link.owner.clone(),
+                        link.repo.clone(),
+                        link.number,
+                        link.reference(),
+                    );
+                    let body = conversation.draft.trim().to_string();
+                    _ = context.spawn_background(move |_| {
+                        let result = GitHub::new(&WinRtTransport)
+                            .create_comment(&token, &owner, &repo, number, &body)
+                            .map(|created| CommentItem::from_comment(&created, now()));
+                        Message::CommentSent { reference, result }
+                    });
+                }
+            }
+            (Session::SignedIn(shell), Message::CommentSent { reference, result }) => {
+                if let Some(conversation) = shell
+                    .conversation
+                    .as_mut()
+                    .filter(|open| open.link.reference() == reference)
+                {
+                    conversation.sending = false;
+                    match result {
+                        // The draft is cleared only once GitHub has the comment.
+                        Ok(comment) => {
+                            conversation.comments.push(comment);
+                            conversation.draft.clear();
+                        }
+                        Err(error) => conversation.error = Some(error.describe()),
                     }
                 }
             }
@@ -428,6 +659,37 @@ fn sign_in_view(sign_in: &SignIn, context: &ViewContext<Guit>) -> View {
 }
 
 fn shell_view(shell: &Shell, context: &ViewContext<Guit>) -> View {
+    let page = match (&shell.conversation, shell.section) {
+        (Some(conversation), _) => pulls::conversation_page(conversation, context),
+        (None, Section::Inbox) => inbox_page(shell, context),
+        (None, Section::PullRequests) => pulls::pulls_page(&shell.pulls, context),
+    };
+
+    NavigationView::new()
+        .pane_display_mode(NavigationViewPaneDisplayMode::LeftCompact)
+        .is_back_button_visible(NavigationViewBackButtonVisible::Collapsed)
+        .is_settings_visible(false)
+        .menu_items((
+            NavigationViewItem::new()
+                .tag("inbox")
+                .content("Inbox")
+                .icon(Symbol::Mail)
+                .is_selected(shell.section == Section::Inbox),
+            NavigationViewItem::new()
+                .tag("pulls")
+                .content("Pull requests")
+                .icon(Symbol::Switch)
+                .is_selected(shell.section == Section::PullRequests),
+        ))
+        .on_selected_tag_changed(
+            context
+                .callback(|tag: Option<Rc<str>>| Message::Navigate(tag.map(|tag| tag.to_string()))),
+        )
+        .content(page)
+        .into()
+}
+
+fn inbox_page(shell: &Shell, context: &ViewContext<Guit>) -> View {
     let inbox = &shell.inbox;
     let filter = inbox.filter();
     let header = Grid::new()
@@ -535,20 +797,9 @@ fn shell_view(shell: &Shell, context: &ViewContext<Guit>) -> View {
         Grid::new().grid_row(2).into()
     };
 
-    let page = Grid::new()
+    Grid::new()
         .rows([GridLength::Auto, GridLength::STAR, GridLength::Auto])
-        .children((header, Grid::new().grid_row(1).children(layers), footer));
-
-    NavigationView::new()
-        .pane_display_mode(NavigationViewPaneDisplayMode::LeftCompact)
-        .is_back_button_visible(NavigationViewBackButtonVisible::Collapsed)
-        .is_settings_visible(false)
-        .menu_items((NavigationViewItem::new()
-            .tag("inbox")
-            .content("Inbox")
-            .icon(Symbol::Mail)
-            .is_selected(true),))
-        .content(page)
+        .children((header, Grid::new().grid_row(1).children(layers), footer))
         .into()
 }
 
@@ -599,7 +850,7 @@ fn row(item: &NotificationItem, context: &ViewContext<Guit>) -> View {
         .into()
 }
 
-fn error_bar(message: &str) -> InfoBar {
+pub(crate) fn error_bar(message: &str) -> InfoBar {
     InfoBar::new()
         .is_open(true)
         .is_closable(false)

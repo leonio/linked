@@ -93,7 +93,8 @@ The same app on windows-rs and windows-reactor, to compare with the C# app. It r
 - [x] 6.5 Manually started workflow publishing versioned zips of both apps (`release.yml`)
 - [ ] 6.6 **[H]** Run the Rust app signed in on a real machine; nobody has seen its inbox yet
 - [x] 6.7 Inbox parity: paging ("Load more"), filters, kind filter, mark as done, background refresh (unconditional for now)
-- [ ] 6.8 Pull requests page and conversations
+- [x] 6.8 Pull requests page; conversations as plain text with a reply box (first 100 comments)
+- [ ] 6.8b Conversation parity: formatted comments, reactions, pull request header, Files changed, comment paging
 - [ ] 6.9 Actions pages
 - [ ] 6.10 **[S]** Measure the signed-in scenarios on one machine: time to a filled inbox, memory, scrolling
 
