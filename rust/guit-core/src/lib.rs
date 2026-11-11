@@ -4,6 +4,7 @@
 //! It has no Windows dependency, so `cargo test -p guit-core` runs on any machine. The app crate
 //! supplies the one platform piece it needs, an implementation of [`http::Transport`].
 
+pub mod actions;
 pub mod api;
 pub mod conversation;
 pub mod device_flow;

@@ -159,6 +159,58 @@ pub struct IssueComment {
     pub author_association: Option<String>,
 }
 
+/// Reply of `GET /repos/{owner}/{repo}/actions/runs`.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+pub struct WorkflowRunList {
+    pub workflow_runs: Vec<WorkflowRun>,
+}
+
+/// Schema: workflow-run.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+pub struct WorkflowRun {
+    pub id: u64,
+    pub display_title: String,
+    pub run_number: u64,
+    pub event: String,
+    pub updated_at: String,
+    pub name: Option<String>,
+    /// "queued", "in_progress", "completed"...
+    pub status: Option<String>,
+    /// Null until completed.
+    pub conclusion: Option<String>,
+    pub head_branch: Option<String>,
+    pub actor: Option<User>,
+}
+
+/// Reply of `GET /repos/{owner}/{repo}/actions/runs/{run_id}/jobs`.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+pub struct JobList {
+    pub jobs: Vec<Job>,
+}
+
+/// Schema: job.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+pub struct Job {
+    pub id: u64,
+    pub name: String,
+    pub status: String,
+    pub conclusion: Option<String>,
+    pub started_at: String,
+    pub completed_at: Option<String>,
+    #[serde(default)]
+    pub steps: Vec<JobStep>,
+}
+
+/// Schema: job.steps[].
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+pub struct JobStep {
+    pub name: String,
+    pub status: String,
+    pub conclusion: Option<String>,
+    pub started_at: Option<String>,
+    pub completed_at: Option<String>,
+}
+
 /// The GitHub client. Cheap to copy around: it only borrows the transport.
 pub struct GitHub<'a, T: Transport + ?Sized> {
     transport: &'a T,
@@ -312,6 +364,105 @@ impl<'a, T: Transport + ?Sized> GitHub<'a, T> {
             Request::post_json(url, json),
             token,
         ))
+    }
+
+    /// operationId: repos/list-for-authenticated-user, most recently pushed first. Returns "owner/name" strings.
+    pub fn my_repositories(&self, token: &str, per_page: u32) -> Result<Vec<String>, ApiError> {
+        #[derive(Deserialize)]
+        struct Repository {
+            full_name: String,
+        }
+
+        let url = format!("{API}/user/repos?sort=pushed&page=1&per_page={per_page}");
+        let repositories: Vec<Repository> =
+            self.json(&Self::authorized(Request::get(url), token))?;
+        Ok(repositories
+            .into_iter()
+            .map(|repository| repository.full_name)
+            .collect())
+    }
+
+    /// operationId: actions/list-workflow-runs-for-repo. Newest first.
+    pub fn workflow_runs(
+        &self,
+        token: &str,
+        owner: &str,
+        repo: &str,
+        page: u32,
+        per_page: u32,
+    ) -> Result<Vec<WorkflowRun>, ApiError> {
+        let url = format!(
+            "{API}/repos/{}/{}/actions/runs?page={page}&per_page={per_page}",
+            encode(owner),
+            encode(repo)
+        );
+        let list: WorkflowRunList = self.json(&Self::authorized(Request::get(url), token))?;
+        Ok(list.workflow_runs)
+    }
+
+    /// operationId: actions/get-workflow-run
+    pub fn workflow_run(
+        &self,
+        token: &str,
+        owner: &str,
+        repo: &str,
+        run_id: u64,
+    ) -> Result<WorkflowRun, ApiError> {
+        let url = format!(
+            "{API}/repos/{}/{}/actions/runs/{run_id}",
+            encode(owner),
+            encode(repo)
+        );
+        self.json(&Self::authorized(Request::get(url), token))
+    }
+
+    /// operationId: actions/list-jobs-for-workflow-run. The first 100 jobs of the latest attempt, with their steps.
+    pub fn jobs(
+        &self,
+        token: &str,
+        owner: &str,
+        repo: &str,
+        run_id: u64,
+    ) -> Result<Vec<Job>, ApiError> {
+        let url = format!(
+            "{API}/repos/{}/{}/actions/runs/{run_id}/jobs?page=1&per_page=100",
+            encode(owner),
+            encode(repo)
+        );
+        let list: JobList = self.json(&Self::authorized(Request::get(url), token))?;
+        Ok(list.jobs)
+    }
+
+    /// operationId: actions/download-job-logs-for-workflow-run. GitHub redirects to a plain-text download,
+    /// which the transport follows; this returns the log text. Logs can be megabytes.
+    pub fn job_log(
+        &self,
+        token: &str,
+        owner: &str,
+        repo: &str,
+        job_id: u64,
+    ) -> Result<String, ApiError> {
+        let url = format!(
+            "{API}/repos/{}/{}/actions/jobs/{job_id}/logs",
+            encode(owner),
+            encode(repo)
+        );
+        self.send(&Self::authorized(Request::get(url), token))
+            .map(|response| response.body)
+    }
+
+    /// operationId: actions/re-run-workflow
+    pub fn rerun(&self, token: &str, owner: &str, repo: &str, run_id: u64) -> Result<(), ApiError> {
+        let mut request = Self::authorized(
+            Request::get(format!(
+                "{API}/repos/{}/{}/actions/runs/{run_id}/rerun",
+                encode(owner),
+                encode(repo)
+            )),
+            token,
+        );
+        request.method = "POST";
+        self.send(&request).map(|_| ())
     }
 
     /// Like `authorized`, but asks for the "full" media type so replies carry `body_text` next to the Markdown.
@@ -593,6 +744,69 @@ mod tests {
             Some(("application/json", r#"{"body":"say \"hi\""}"#.to_string()))
         );
         assert_eq!(created.id, 12);
+    }
+
+    #[test]
+    fn actions_calls_use_the_right_paths_and_map_replies() {
+        let transport = Canned::new()
+            .reply(200, r#"[{"id":9,"full_name":"octocat/hello"},{"id":10,"full_name":"octocat/other"}]"#)
+            .reply(200, r#"{"total_count":1,"workflow_runs":[{"id":30433642,"name":null,"display_title":"Fix it","run_number":12,"event":"push",
+                "status":"in_progress","conclusion":null,"head_branch":null,"updated_at":"2026-01-02T00:05:00Z"}]}"#)
+            .reply(200, r#"{"total_count":1,"jobs":[{"id":1,"name":"build","status":"completed","conclusion":"success",
+                "started_at":"2026-01-02T00:00:10Z","completed_at":"2026-01-02T00:02:15Z",
+                "steps":[{"name":"Checkout","status":"completed","conclusion":"success","number":1,
+                          "started_at":"2026-01-02T00:00:10Z","completed_at":"2026-01-02T00:00:12Z"},
+                         {"name":"Test","status":"queued","conclusion":null,"number":2}]},
+                {"id":2,"name":"lint","status":"queued","conclusion":null,"started_at":"2026-01-02T00:00:10Z","completed_at":null}]}"#)
+            .reply(200, "line one\nline two\n")
+            .reply(201, "{}");
+        let github = GitHub::new(&transport);
+
+        let repositories = github.my_repositories("tok", 50).unwrap();
+        let runs = github
+            .workflow_runs("tok", "octocat", "hello", 2, 30)
+            .unwrap();
+        let jobs = github.jobs("tok", "octocat", "hello", 30433642).unwrap();
+        let log = github.job_log("tok", "octocat", "hello", 1).unwrap();
+        github.rerun("tok", "octocat", "hello", 30433642).unwrap();
+
+        let sent = transport.sent.borrow();
+        assert_eq!(
+            sent[0].url,
+            "https://api.github.com/user/repos?sort=pushed&page=1&per_page=50"
+        );
+        assert_eq!(
+            sent[1].url,
+            "https://api.github.com/repos/octocat/hello/actions/runs?page=2&per_page=30"
+        );
+        assert_eq!(
+            sent[2].url,
+            "https://api.github.com/repos/octocat/hello/actions/runs/30433642/jobs?page=1&per_page=100"
+        );
+        assert_eq!(
+            sent[3].url,
+            "https://api.github.com/repos/octocat/hello/actions/jobs/1/logs"
+        );
+        assert_eq!(
+            (sent[4].method, sent[4].url.as_str()),
+            (
+                "POST",
+                "https://api.github.com/repos/octocat/hello/actions/runs/30433642/rerun"
+            )
+        );
+        assert_eq!(repositories, ["octocat/hello", "octocat/other"]);
+        assert_eq!(
+            (
+                runs[0].run_number,
+                runs[0].conclusion.as_deref(),
+                runs[0].name.as_deref()
+            ),
+            (12, None, None)
+        );
+        assert_eq!(jobs[0].steps.len(), 2);
+        assert_eq!(jobs[0].steps[1].started_at, None);
+        assert!(jobs[1].steps.is_empty());
+        assert_eq!(log, "line one\nline two\n");
     }
 
     #[test]
