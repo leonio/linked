@@ -31,17 +31,27 @@ jobs:
         run: ./artifacts/publish/Guit.AotSmoke/release_linux-x64/Guit.AotSmoke
 
   app:
-    name: WinUI app (build, Native AOT publish)
-    runs-on: windows-latest
+    name: WinUI app ${{ matrix.rid }} (build, Native AOT publish, launch)
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - rid: win-x64
+            platform: x64
+            os: windows-latest
+          - rid: win-arm64
+            platform: ARM64
+            os: windows-11-arm
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
       - name: Build
-        run: dotnet build src/Guit.App -c Release -p:Platform=x64
+        run: dotnet build src/Guit.App -c Release -p:Platform=${{ matrix.platform }}
       - name: Publish Native AOT
-        run: dotnet publish src/Guit.App -c Release -r win-x64 -p:Platform=x64
+        run: dotnet publish src/Guit.App -c Release -r ${{ matrix.rid }} -p:Platform=${{ matrix.platform }}
       - name: Report binary size
         shell: pwsh
         run: |
@@ -86,6 +96,6 @@ jobs:
           }
       - uses: actions/upload-artifact@v4
         with:
-          name: Guit-win-x64
+          name: Guit-${{ matrix.rid }}
           path: artifacts/publish/Guit.App/
           if-no-files-found: error
