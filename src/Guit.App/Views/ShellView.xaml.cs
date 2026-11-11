@@ -30,12 +30,14 @@ public sealed partial class ShellView : UserControl
 
     private void OnNavigationSelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
     {
-        Route route = (args.SelectedItem as NavigationViewItem)?.Tag switch
-        {
-            "pulls" => Route.PullRequests,
-            "runs" => Route.Runs,
-            _ => Route.Inbox,
-        };
+        Route route = args.IsSettingsSelected
+            ? Route.Settings
+            : (args.SelectedItem as NavigationViewItem)?.Tag switch
+            {
+                "pulls" => Route.PullRequests,
+                "runs" => Route.Runs,
+                _ => Route.Inbox,
+            };
 
         _navigator.Frame = ContentFrame;
         _navigator.Navigate(route);

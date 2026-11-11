@@ -25,6 +25,12 @@ public partial class App : Application
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
         _window = new MainWindow();
+
+        // Apply the saved theme before the window is shown, so it never flashes the wrong one.
+        ThemeService themes = Services.GetRequiredService<ThemeService>();
+        themes.Window = _window;
+        themes.Apply(SettingKeys.ReadTheme(Services.GetRequiredService<ISettingsStore>()));
+
         _window.Activate();
     }
 
@@ -37,6 +43,10 @@ public partial class App : Application
         services.AddSingleton<IUiDispatcher>(new UiDispatcher());
         services.AddSingleton<Navigator>();
         services.AddSingleton<INavigator>(static provider => provider.GetRequiredService<Navigator>());
+        services.AddSingleton<ISettingsStore, JsonSettingsStore>();
+        services.AddSingleton<ThemeService>();
+        services.AddSingleton<IThemeService>(static provider => provider.GetRequiredService<ThemeService>());
+        services.AddSingleton(new AppInfo(typeof(App).Assembly.GetName().Version?.ToString(3) ?? "0.0.0"));
         services.AddGuitCore();
         return services.BuildServiceProvider();
     }

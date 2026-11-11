@@ -24,6 +24,7 @@ internal sealed class Navigator : INavigator
             Route.PullRequests => typeof(PullRequestsPage),
             Route.RunDetail => typeof(RunDetailPage),
             Route.Runs => typeof(RunsPage),
+            Route.Settings => typeof(SettingsPage),
             _ => typeof(PlaceholderPage),
         };
 

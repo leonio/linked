@@ -13,7 +13,7 @@
         x:Name="Navigation"
         x:Load="{x:Bind ViewModel.IsSignedIn, Mode=OneWay}"
         IsBackButtonVisible="Collapsed"
-        IsSettingsVisible="False"
+        IsSettingsVisible="True"
         Loaded="OnNavigationLoaded"
         PaneDisplayMode="LeftCompact"
         SelectionChanged="OnNavigationSelectionChanged">
