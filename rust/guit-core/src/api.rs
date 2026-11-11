@@ -113,6 +113,52 @@ pub struct RepositorySummary {
     pub owner: User,
 }
 
+/// Reply of `GET /search/issues`.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+pub struct IssueSearchResult {
+    pub total_count: u64,
+    pub items: Vec<IssueSearchItem>,
+}
+
+/// Schema: issue-search-result-item.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+pub struct IssueSearchItem {
+    pub number: u32,
+    pub title: String,
+    pub updated_at: String,
+    pub html_url: String,
+    /// API URL of the repository: `https://api.github.com/repos/{owner}/{repo}`.
+    pub repository_url: String,
+    /// Null when the author's account was deleted.
+    pub user: Option<User>,
+    pub draft: Option<bool>,
+}
+
+/// Schema: issue. Pull requests are issues too, so this serves both.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+pub struct Issue {
+    pub id: u64,
+    pub number: u32,
+    pub title: String,
+    pub state: String,
+    pub created_at: String,
+    pub user: Option<User>,
+    /// The body as plain text. Present because requests ask for the "full" media type.
+    pub body_text: Option<String>,
+    /// Present (whatever its content) when this issue is a pull request.
+    pub pull_request: Option<serde_json::Value>,
+}
+
+/// Schema: issue-comment.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+pub struct IssueComment {
+    pub id: u64,
+    pub created_at: String,
+    pub user: Option<User>,
+    pub body_text: Option<String>,
+    pub author_association: Option<String>,
+}
+
 /// The GitHub client. Cheap to copy around: it only borrows the transport.
 pub struct GitHub<'a, T: Transport + ?Sized> {
     transport: &'a T,
@@ -196,6 +242,84 @@ impl<'a, T: Transport + ?Sized> GitHub<'a, T> {
         );
         request.method = "DELETE";
         self.send(&request).map(|_| ())
+    }
+
+    /// operationId: search/issues-and-pull-requests. Limited to 30 requests a minute: never poll it.
+    pub fn search_issues(
+        &self,
+        token: &str,
+        query: &str,
+        page: u32,
+        per_page: u32,
+    ) -> Result<IssueSearchResult, ApiError> {
+        let url = format!(
+            "{API}/search/issues?q={}&sort=updated&order=desc&page={page}&per_page={per_page}",
+            encode(query)
+        );
+        self.json(&Self::authorized(Request::get(url), token))
+    }
+
+    /// operationId: issues/get
+    pub fn issue(
+        &self,
+        token: &str,
+        owner: &str,
+        repo: &str,
+        number: u32,
+    ) -> Result<Issue, ApiError> {
+        let url = format!(
+            "{API}/repos/{}/{}/issues/{number}",
+            encode(owner),
+            encode(repo)
+        );
+        self.json(&Self::with_text_bodies(Request::get(url), token))
+    }
+
+    /// operationId: issues/list-comments. Oldest first.
+    pub fn issue_comments(
+        &self,
+        token: &str,
+        owner: &str,
+        repo: &str,
+        number: u32,
+        page: u32,
+        per_page: u32,
+    ) -> Result<Vec<IssueComment>, ApiError> {
+        let url = format!(
+            "{API}/repos/{}/{}/issues/{number}/comments?page={page}&per_page={per_page}",
+            encode(owner),
+            encode(repo)
+        );
+        self.json(&Self::with_text_bodies(Request::get(url), token))
+    }
+
+    /// operationId: issues/create-comment
+    pub fn create_comment(
+        &self,
+        token: &str,
+        owner: &str,
+        repo: &str,
+        number: u32,
+        body: &str,
+    ) -> Result<IssueComment, ApiError> {
+        let url = format!(
+            "{API}/repos/{}/{}/issues/{number}/comments",
+            encode(owner),
+            encode(repo)
+        );
+        let json = serde_json::json!({ "body": body }).to_string();
+        self.json(&Self::with_text_bodies(
+            Request::post_json(url, json),
+            token,
+        ))
+    }
+
+    /// Like `authorized`, but asks for the "full" media type so replies carry `body_text` next to the Markdown.
+    fn with_text_bodies(request: Request, token: &str) -> Request {
+        request
+            .header("Authorization", format!("Bearer {token}"))
+            .header("Accept", "application/vnd.github.full+json")
+            .header("X-GitHub-Api-Version", API_VERSION)
     }
 
     fn authorized(request: Request, token: &str) -> Request {
@@ -391,6 +515,84 @@ mod tests {
             (sent.method, sent.url.as_str()),
             ("DELETE", "https://api.github.com/notifications/threads/42")
         );
+    }
+
+    #[test]
+    fn search_encodes_the_query_and_maps_items() {
+        let transport = Canned::new().reply(200, r#"{"total_count":1,"incomplete_results":false,"items":[
+            {"id":70,"number":7,"title":"Fix it","state":"open","comments":2,"updated_at":"2026-01-02T03:04:05Z",
+             "html_url":"https://github.com/octocat/hello/pull/7","repository_url":"https://api.github.com/repos/octocat/hello",
+             "user":null,"draft":true}]}"#);
+
+        let found = GitHub::new(&transport)
+            .search_issues("tok", "is:open is:pr author:@me", 2, 50)
+            .unwrap();
+
+        assert_eq!(
+            transport.sent.borrow()[0].url,
+            "https://api.github.com/search/issues?q=is%3Aopen%20is%3Apr%20author%3A%40me&sort=updated&order=desc&page=2&per_page=50"
+        );
+        assert_eq!(found.total_count, 1);
+        assert_eq!(found.items[0].number, 7);
+        assert_eq!(found.items[0].user, None);
+        assert_eq!(found.items[0].draft, Some(true));
+    }
+
+    #[test]
+    fn issues_and_comments_ask_for_text_bodies() {
+        let transport = Canned::new()
+            .reply(200, r#"{"id":70,"number":7,"title":"Fix it","state":"open","created_at":"2026-01-01T00:00:00Z",
+                "user":{"login":"octocat","id":1,"avatar_url":"https://avatars/1","html_url":"https://github.com/octocat"},
+                "body_text":"Please review","pull_request":{"html_url":"https://github.com/octocat/hello/pull/7"}}"#)
+            .reply(200, r#"[{"id":11,"created_at":"2026-01-02T00:00:00Z","user":null,"body_text":"Looks good","author_association":"MEMBER"}]"#);
+        let github = GitHub::new(&transport);
+
+        let issue = github.issue("tok", "octocat", "hello", 7).unwrap();
+        let comments = github
+            .issue_comments("tok", "octocat", "hello", 7, 3, 50)
+            .unwrap();
+
+        let sent = transport.sent.borrow();
+        assert_eq!(
+            sent[0].url,
+            "https://api.github.com/repos/octocat/hello/issues/7"
+        );
+        assert!(
+            sent[0]
+                .headers
+                .contains(&("Accept", "application/vnd.github.full+json".to_string()))
+        );
+        assert_eq!(
+            sent[1].url,
+            "https://api.github.com/repos/octocat/hello/issues/7/comments?page=3&per_page=50"
+        );
+        assert_eq!(issue.body_text.as_deref(), Some("Please review"));
+        assert!(issue.pull_request.is_some());
+        assert_eq!(comments[0].user, None);
+        assert_eq!(comments[0].author_association.as_deref(), Some("MEMBER"));
+    }
+
+    #[test]
+    fn create_comment_posts_json() {
+        let transport = Canned::new().reply(
+            201,
+            r#"{"id":12,"created_at":"2026-01-03T00:00:00Z","user":null,"body_text":"say \"hi\""}"#,
+        );
+
+        let created = GitHub::new(&transport)
+            .create_comment("tok", "o", "r", 2, "say \"hi\"")
+            .unwrap();
+
+        let sent = &transport.sent.borrow()[0];
+        assert_eq!(
+            (sent.method, sent.url.as_str()),
+            ("POST", "https://api.github.com/repos/o/r/issues/2/comments")
+        );
+        assert_eq!(
+            sent.body,
+            Some(("application/json", r#"{"body":"say \"hi\""}"#.to_string()))
+        );
+        assert_eq!(created.id, 12);
     }
 
     #[test]

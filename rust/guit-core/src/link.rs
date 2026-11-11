@@ -34,6 +34,21 @@ impl SubjectLink {
         })
     }
 
+    /// Builds a link from a search result: the repository's API URL and a pull request number.
+    pub fn from_repository_url(
+        repository_url: &str,
+        number: u32,
+        is_pull_request: bool,
+    ) -> Option<Self> {
+        let kind = if is_pull_request { "pulls" } else { "issues" };
+        Self::parse(Some(&format!("{repository_url}/{kind}/{number}")))
+    }
+
+    /// "owner/repo #12".
+    pub fn reference(&self) -> String {
+        format!("{}/{} #{}", self.owner, self.repo, self.number)
+    }
+
     /// The page on github.com.
     pub fn web_url(&self) -> String {
         let kind = if self.is_pull_request {
@@ -76,6 +91,19 @@ mod tests {
             SubjectLink::parse(Some("https://api.github.com/repos/octocat/hello/pulls/7")).unwrap();
         assert!(pull.is_pull_request);
         assert_eq!(pull.web_url(), "https://github.com/octocat/hello/pull/7");
+    }
+
+    #[test]
+    fn a_search_result_becomes_a_link() {
+        let link =
+            SubjectLink::from_repository_url("https://api.github.com/repos/octocat/hello", 7, true)
+                .unwrap();
+        assert_eq!(link.reference(), "octocat/hello #7");
+        assert!(link.is_pull_request);
+        assert_eq!(
+            SubjectLink::from_repository_url("https://example.com/x", 7, true),
+            None
+        );
     }
 
     #[test]

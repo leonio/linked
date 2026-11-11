@@ -34,6 +34,15 @@ impl Request {
         }
     }
 
+    pub fn post_json(url: impl Into<String>, json: String) -> Self {
+        Self {
+            method: "POST",
+            url: url.into(),
+            headers: Vec::new(),
+            body: Some(("application/json", json)),
+        }
+    }
+
     pub fn header(mut self, name: &'static str, value: impl Into<String>) -> Self {
         self.headers.push((name, value.into()));
         self

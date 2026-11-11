@@ -5,6 +5,7 @@
 //! supplies the one platform piece it needs, an implementation of [`http::Transport`].
 
 pub mod api;
+pub mod conversation;
 pub mod device_flow;
 pub mod http;
 pub mod inbox;
