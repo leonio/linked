@@ -42,6 +42,7 @@ one layer, one or two files plus tests, a worked example to copy.
 - [x] 2.8 Item actions: mark as read, mark as done
 - [x] 2.9 Refresh: button, F5, and a background poll
 - [x] 2.10 Open a notification (`SubjectLink` parser; conversation or browser)
+- [x] 2.11 Filter by kind of notification (client-side, with bounded top-up paging)
 
 ## Phase 3 - Conversations, the messaging ([cards](tasks/phase-3-conversations.md))
 
@@ -54,6 +55,9 @@ one layer, one or two files plus tests, a worked example to copy.
 - [x] 3.7 Pull request header: Pulls API + state, branches, diff size
 - [x] 3.8 "Pull requests" page: search API + list
 - [x] 3.9 **[S]** Markdown rendering: evaluate options, pick one, implement
+- [x] 3.10 "Files changed": a pull request's files and coloured diffs (`DiffRow`, `PullFilesViewModel`, `PullFilesPage`)
+- [ ] 3.11 **[S]** Browse repository code: file tree and a read-only file viewer (contents API)
+- [ ] 3.12 **[S]** Syntax colouring for diffs and the file viewer
 
 ## Phase 4 - Actions, the jobs ([cards](tasks/phase-4-actions.md))
 
@@ -62,6 +66,9 @@ one layer, one or two files plus tests, a worked example to copy.
 - [x] 4.3 `RunsViewModel` and `RunsPage`
 - [x] 4.4 `JobsViewModel` and run detail page
 - [x] 4.5 Re-run a workflow
+- [x] 4.6 Run detail: step rows under each job, self-updating while a run is live or was just re-run
+- [x] 4.7 Job log page (`ActionsLog`, `JobLogViewModel`, `JobLogPage`): last 5,000 lines, cleaned
+- [ ] 4.8 Live log while a job is still running (GitHub only publishes a log when the job ends; needs another source)
 
 ## Phase 5 - Speed and shipping ([cards](tasks/phase-5-speed-and-shipping.md))
 
