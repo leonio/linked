@@ -20,6 +20,7 @@ internal sealed class Navigator : INavigator
             Route.Conversation => typeof(ConversationPage),
             Route.Inbox => typeof(InboxPage),
             Route.JobLog => typeof(JobLogPage),
+            Route.PullFiles => typeof(PullFilesPage),
             Route.PullRequests => typeof(PullRequestsPage),
             Route.RunDetail => typeof(RunDetailPage),
             Route.Runs => typeof(RunsPage),

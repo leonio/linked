@@ -49,14 +49,22 @@
           <Run Text="{x:Bind ViewModel.DiffSummary, Mode=OneWay}" />
         </TextBlock>
       </StackPanel>
-      <Button
+      <StackPanel
           Grid.Column="2"
           VerticalAlignment="Top"
-          AutomationProperties.Name="Open on GitHub"
-          Command="{x:Bind ViewModel.OpenInBrowserCommand}"
-          ToolTipService.ToolTip="Open on GitHub">
-        <FontIcon FontSize="16" Glyph="&#xE8A7;" />
-      </Button>
+          Orientation="Horizontal"
+          Spacing="8">
+        <Button
+            Command="{x:Bind ViewModel.ShowFilesCommand}"
+            Content="Files changed"
+            Visibility="{x:Bind ViewModel.IsPullRequest, Mode=OneWay}" />
+        <Button
+            AutomationProperties.Name="Open on GitHub"
+            Command="{x:Bind ViewModel.OpenInBrowserCommand}"
+            ToolTipService.ToolTip="Open on GitHub">
+          <FontIcon FontSize="16" Glyph="&#xE8A7;" />
+        </Button>
+      </StackPanel>
     </Grid>
 
     <ListView
