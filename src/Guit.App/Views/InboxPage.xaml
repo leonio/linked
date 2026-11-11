@@ -16,6 +16,7 @@
         <ColumnDefinition Width="Auto" />
         <ColumnDefinition Width="*" />
         <ColumnDefinition Width="Auto" />
+        <ColumnDefinition Width="Auto" />
       </Grid.ColumnDefinitions>
       <TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="Inbox" />
       <!-- Item order must match the InboxFilter enum values. -->
@@ -27,8 +28,24 @@
         <SelectorBarItem Text="All" />
         <SelectorBarItem Text="Participating" />
       </SelectorBar>
-      <Button
+      <!-- Item order must match the InboxKind enum values. -->
+      <ComboBox
           Grid.Column="2"
+          MinWidth="160"
+          VerticalAlignment="Center"
+          AutomationProperties.Name="Kind of notification"
+          SelectedIndex="0"
+          SelectionChanged="OnKindSelectionChanged">
+        <ComboBoxItem Content="All kinds" />
+        <ComboBoxItem Content="Pull requests" />
+        <ComboBoxItem Content="Issues" />
+        <ComboBoxItem Content="Releases" />
+        <ComboBoxItem Content="Discussions" />
+        <ComboBoxItem Content="Checks" />
+        <ComboBoxItem Content="Other" />
+      </ComboBox>
+      <Button
+          Grid.Column="3"
           VerticalAlignment="Center"
           AutomationProperties.Name="Refresh"
           Command="{x:Bind ViewModel.RefreshCommand}"

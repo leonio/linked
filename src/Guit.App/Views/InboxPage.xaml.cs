@@ -71,4 +71,13 @@ public sealed partial class InboxPage : Page
 
     private void OnItemClick(object sender, ItemClickEventArgs e)
         => ViewModel.OpenCommand.Execute(e.ClickedItem as NotificationItem);
+
+    private void OnKindSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        int index = ((ComboBox)sender).SelectedIndex;
+        if (index >= 0)
+        {
+            ViewModel.Kind = (InboxKind)index;
+        }
+    }
 }
