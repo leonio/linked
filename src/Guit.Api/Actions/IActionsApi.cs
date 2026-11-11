@@ -19,6 +19,13 @@ public interface IActionsApi
     [Get("/repos/{owner}/{repo}/actions/runs/{runId}/jobs")]
     Task<JobList> ListJobsAsync(string owner, string repo, long runId, int page, [AliasAs("per_page")] int perPage, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// operationId: actions/download-job-logs-for-workflow-run. GitHub answers with a redirect to a short-lived
+    /// plain-text download; the HTTP handler follows it, so this returns the log text itself. Logs can be megabytes.
+    /// </summary>
+    [Get("/repos/{owner}/{repo}/actions/jobs/{jobId}/logs")]
+    Task<string> GetJobLogsAsync(string owner, string repo, long jobId, CancellationToken cancellationToken);
+
     /// <summary>operationId: actions/re-run-workflow</summary>
     [Post("/repos/{owner}/{repo}/actions/runs/{runId}/rerun")]
     Task RerunAsync(string owner, string repo, long runId, CancellationToken cancellationToken);
@@ -55,4 +62,18 @@ public sealed record Job(
     DateTimeOffset StartedAt,
     string HtmlUrl,
     string? Conclusion = null,
+    DateTimeOffset? CompletedAt = null,
+    JobStep[]? Steps = null);
+
+/// <summary>Schema: job.steps[] (inline object).</summary>
+/// <param name="Name">The step name as shown on github.com.</param>
+/// <param name="Status">"queued", "in_progress" or "completed".</param>
+/// <param name="Number">1-based position within the job.</param>
+/// <param name="Conclusion">Null until completed.</param>
+public sealed record JobStep(
+    string Name,
+    string Status,
+    int Number,
+    string? Conclusion = null,
+    DateTimeOffset? StartedAt = null,
     DateTimeOffset? CompletedAt = null);

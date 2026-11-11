@@ -479,6 +479,16 @@ internal sealed class FakeActionsApi(params WorkflowRun[][] runPages) : IActions
             : Task.FromResult(new JobList(Jobs.Length, Jobs));
     }
 
+    public string Log { get; set; } = string.Empty;
+
+    public List<long> LogCalls { get; } = [];
+
+    public Task<string> GetJobLogsAsync(string owner, string repo, long jobId, CancellationToken cancellationToken)
+    {
+        LogCalls.Add(jobId);
+        return TakeFailure() is { } failure ? Task.FromException<string>(failure) : Task.FromResult(Log);
+    }
+
     public Task RerunAsync(string owner, string repo, long runId, CancellationToken cancellationToken)
     {
         if (TakeFailure() is { } failure)

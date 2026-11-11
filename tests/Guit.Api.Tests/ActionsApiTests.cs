@@ -1,5 +1,6 @@
 using Guit.Api.Actions;
 using Guit.Api.Repos;
+using Refit.Testing;
 
 namespace Guit.Api.Tests;
 
@@ -85,5 +86,44 @@ public sealed class ActionsApiTests
         await Assert.That(http.Path).IsEqualTo("/repos/o/r/actions/runs/30433642");
         await Assert.That(run.RunNumber).IsEqualTo(12);
         await Assert.That(run.Conclusion).IsEqualTo("success");
+    }
+
+    [Test]
+    public async Task ListJobs_maps_steps()
+    {
+        using RecordingHandler http = new("""
+            { "total_count": 1, "jobs": [
+              { "id": 1, "name": "build", "status": "in_progress", "conclusion": null, "started_at": "2026-01-02T00:00:10Z", "completed_at": null,
+                "html_url": "https://github.com/o/r/actions/runs/5/job/1",
+                "steps": [
+                  { "name": "Set up job", "status": "completed", "conclusion": "success", "number": 1, "started_at": "2026-01-02T00:00:10Z", "completed_at": "2026-01-02T00:00:12Z" },
+                  { "name": "Build", "status": "in_progress", "conclusion": null, "number": 2, "started_at": "2026-01-02T00:00:12Z", "completed_at": null },
+                  { "name": "Test", "status": "queued", "conclusion": null, "number": 3 } ] } ] }
+            """);
+
+        JobList list = await Stub.Client<IActionsApi>(http).ListJobsAsync("o", "r", 5, page: 1, perPage: 100, CancellationToken.None);
+
+        JobStep[] steps = list.Jobs[0].Steps!;
+        await Assert.That(steps.Length).IsEqualTo(3);
+        await Assert.That(steps[0].Conclusion).IsEqualTo("success");
+        await Assert.That(steps[0].CompletedAt).IsEqualTo(new DateTimeOffset(2026, 1, 2, 0, 0, 12, TimeSpan.Zero));
+        await Assert.That(steps[1].Status).IsEqualTo("in_progress");
+        await Assert.That(steps[2].StartedAt).IsNull();
+        await Assert.That(steps[2].Number).IsEqualTo(3);
+    }
+
+    [Test]
+    public async Task GetJobLogs_returns_the_raw_text()
+    {
+        using StubHttp http = new()
+        {
+            { Route.Get("/repos/o/r/actions/jobs/{id}/logs"), Reply.Text("2026-01-02T00:00:10.1234567Z line one\n2026-01-02T00:00:11.1234567Z line \"two\"\n") },
+        };
+
+        string log = await Stub.Client<IActionsApi>(http).GetJobLogsAsync("o", "r", 77, CancellationToken.None);
+
+        await Assert.That(log).IsEqualTo("2026-01-02T00:00:10.1234567Z line one\n2026-01-02T00:00:11.1234567Z line \"two\"\n");
+        await Assert.That(http.Requests[0].RequestUri!.AbsolutePath).IsEqualTo("/repos/o/r/actions/jobs/77/logs");
+        http.VerifyAllCalled();
     }
 }
