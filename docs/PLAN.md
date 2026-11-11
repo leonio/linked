@@ -82,6 +82,21 @@ one layer, one or two files plus tests, a worked example to copy.
 - [ ] 5.7b **[S]** Move to CsWinRT 3 when it is stable (still a preview in November 2026)
 - [ ] 5.8 **[S][H]** Head-to-head: the same inbox page in C++/WinRT, measured against this app (needs a Windows machine with Visual Studio; the C# half is in `docs/benchmarks.md`)
 
+## Phase 6 - The Rust app, side by side (state and next steps in `HANDOVER.md`)
+
+The same app on windows-rs and windows-reactor, to compare with the C# app. It replaces card 5.8.
+
+- [x] 6.1 Cargo workspace; `guit-core` (GitHub client, device flow, time, links, inbox rows) with tests
+- [x] 6.2 `guit`: WinRT platform layer, sign-in, shell and inbox on windows-reactor
+- [x] 6.3 CI: core tests on Linux; build, stage, launch and time on Windows x64 and ARM64
+- [x] 6.4 One measuring script for both apps (`tools/measure-startup.ps1`)
+- [x] 6.5 Manually started workflow publishing versioned zips of both apps (`release.yml`)
+- [ ] 6.6 **[H]** Run the Rust app signed in on a real machine; nobody has seen its inbox yet
+- [ ] 6.7 Inbox parity: paging, kind filter, mark as done, background refresh
+- [ ] 6.8 Pull requests page and conversations
+- [ ] 6.9 Actions pages
+- [ ] 6.10 **[S]** Measure the signed-in scenarios on one machine: time to a filled inbox, memory, scrolling
+
 ## Known limits (decided, not to be "fixed" by a task)
 
 - GitHub's website "For you" feed is not in the API. The feed here is notifications (2.x); an activity

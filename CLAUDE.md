@@ -29,8 +29,16 @@ tests/Guit.Api.Tests               TUnit + Refit.Testing (StubHttp). No network,
 tests/Guit.Core.Tests              TUnit + hand-written fakes (Fakes.cs).
 tests/Guit.AotSmoke                Native AOT console app that runs the real DI graph. The AOT truth test.
 tools/ghapi.py                       Look up operations and schemas in GitHub's OpenAPI description.
+tools/measure-startup.ps1            Times start-up of either app the same way (used by CI and by people).
 docs/PLAN.md, docs/tasks/            The roadmap and the task cards.
+
+rust/guit-core                       The Rust side's GitHub client and view logic. No Windows APIs; tests run anywhere.
+rust/guit                            The Rust app: windows-reactor UI and the WinRT platform layer. Windows only.
 ```
+
+There are two apps here on purpose: the C# app (`src/`) and a Rust app (`rust/`) that is being grown to match it,
+so the two can be measured side by side. `docs/benchmarks.md` has the numbers; `docs/HANDOVER.md` has the state of
+the Rust work. A feature is added to the C# app first; the Rust app follows the same order.
 
 Dependencies point one way: `App -> Core -> Api`. Api types (DTOs) stop at Core: XAML binds to Core types only.
 
@@ -52,6 +60,15 @@ dotnet publish src/Guit.App -c Release -r win-x64 -p:Platform=x64
 
 If you are not on Windows you cannot build `Guit.App`. Say so in your report; CI (`.github/workflows/ci.yml`)
 builds it, publishes it with Native AOT, and launches the exe. Never claim the app works because it compiled.
+
+Rust (from `rust/`):
+
+```bash
+cargo test -p guit-core
+cargo check -p guit --target x86_64-pc-windows-msvc   # type-checks the Windows app from any OS; it cannot link or run here
+```
+
+`.github/workflows/release.yml` is started by hand and publishes versioned zips of both apps.
 
 ## Hard rules
 
