@@ -48,15 +48,20 @@ pub fn wait_for_token<T: Transport + ?Sized>(
         match reply.error.as_deref() {
             Some("authorization_pending") => {}
             Some("slow_down") => {
-                interval = reply.interval.map_or(interval + Duration::from_secs(5), Duration::from_secs);
+                interval = reply
+                    .interval
+                    .map_or(interval + Duration::from_secs(5), Duration::from_secs);
             }
             Some("access_denied") => return Ok(DeviceFlowOutcome::Denied),
             Some("expired_token") => return Ok(DeviceFlowOutcome::Expired),
             other => {
                 return Err(ApiError::Decode(
-                    reply.error_description.or_else(|| other.map(str::to_string)).unwrap_or_else(|| {
-                        "The device flow reply had neither a token nor an error.".to_string()
-                    }),
+                    reply
+                        .error_description
+                        .or_else(|| other.map(str::to_string))
+                        .unwrap_or_else(|| {
+                            "The device flow reply had neither a token nor an error.".to_string()
+                        }),
                 ));
             }
         }
@@ -83,7 +88,10 @@ mod tests {
         let transport = Canned::new()
             .reply(200, r#"{"error":"authorization_pending"}"#)
             .reply(200, r#"{"error":"slow_down","interval":10}"#)
-            .reply(200, r#"{"access_token":"gho_abc","token_type":"bearer","scope":"repo"}"#);
+            .reply(
+                200,
+                r#"{"access_token":"gho_abc","token_type":"bearer","scope":"repo"}"#,
+            );
         let mut sleeps = Vec::new();
 
         let outcome = wait_for_token(&GitHub::new(&transport), "id", &code(5, 900), |wait| {
@@ -97,7 +105,9 @@ mod tests {
 
     #[test]
     fn slow_down_without_an_interval_adds_five_seconds() {
-        let transport = Canned::new().reply(200, r#"{"error":"slow_down"}"#).reply(200, r#"{"error":"access_denied"}"#);
+        let transport = Canned::new()
+            .reply(200, r#"{"error":"slow_down"}"#)
+            .reply(200, r#"{"error":"access_denied"}"#);
         let mut sleeps = Vec::new();
 
         let outcome = wait_for_token(&GitHub::new(&transport), "id", &code(5, 900), |wait| {
@@ -112,14 +122,23 @@ mod tests {
     #[test]
     fn terminal_errors_expiry_and_cancel() {
         let expired = Canned::new().reply(200, r#"{"error":"expired_token"}"#);
-        assert_eq!(wait_for_token(&GitHub::new(&expired), "id", &code(5, 900), |_| true), Ok(DeviceFlowOutcome::Expired));
+        assert_eq!(
+            wait_for_token(&GitHub::new(&expired), "id", &code(5, 900), |_| true),
+            Ok(DeviceFlowOutcome::Expired)
+        );
 
         // The code's lifetime runs out before GitHub is even asked again.
         let never_asked = Canned::new();
-        assert_eq!(wait_for_token(&GitHub::new(&never_asked), "id", &code(5, 3), |_| true), Ok(DeviceFlowOutcome::Expired));
+        assert_eq!(
+            wait_for_token(&GitHub::new(&never_asked), "id", &code(5, 3), |_| true),
+            Ok(DeviceFlowOutcome::Expired)
+        );
 
         let cancelled = Canned::new();
-        assert_eq!(wait_for_token(&GitHub::new(&cancelled), "id", &code(5, 900), |_| false), Ok(DeviceFlowOutcome::Cancelled));
+        assert_eq!(
+            wait_for_token(&GitHub::new(&cancelled), "id", &code(5, 900), |_| false),
+            Ok(DeviceFlowOutcome::Cancelled)
+        );
         assert!(cancelled.sent.borrow().is_empty());
     }
 
@@ -129,6 +148,11 @@ mod tests {
 
         let outcome = wait_for_token(&GitHub::new(&transport), "id", &code(5, 900), |_| true);
 
-        assert_eq!(outcome, Err(ApiError::Decode("Device Flow must be explicitly enabled for this App".into())));
+        assert_eq!(
+            outcome,
+            Err(ApiError::Decode(
+                "Device Flow must be explicitly enabled for this App".into()
+            ))
+        );
     }
 }

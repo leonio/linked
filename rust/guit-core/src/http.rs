@@ -12,7 +12,12 @@ pub struct Request {
 
 impl Request {
     pub fn get(url: impl Into<String>) -> Self {
-        Self { method: "GET", url: url.into(), headers: Vec::new(), body: None }
+        Self {
+            method: "GET",
+            url: url.into(),
+            headers: Vec::new(),
+            body: None,
+        }
     }
 
     pub fn post_form(url: impl Into<String>, fields: &[(&str, &str)]) -> Self {
@@ -46,7 +51,10 @@ pub struct Response {
 
 impl Response {
     pub fn header(&self, name: &str) -> Option<&str> {
-        self.headers.iter().find(|(key, _)| key == name).map(|(_, value)| value.as_str())
+        self.headers
+            .iter()
+            .find(|(key, _)| key == name)
+            .map(|(_, value)| value.as_str())
     }
 }
 
@@ -61,7 +69,9 @@ pub fn encode(value: &str) -> String {
     let mut out = String::with_capacity(value.len());
     for byte in value.bytes() {
         match byte {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' => out.push(byte as char),
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' => {
+                out.push(byte as char)
+            }
             _ => {
                 out.push('%');
                 out.push(char::from(b"0123456789ABCDEF"[(byte >> 4) as usize]));
@@ -78,13 +88,23 @@ mod tests {
 
     #[test]
     fn a_form_is_percent_encoded() {
-        let request = Request::post_form("https://x/y", &[("grant_type", "urn:ietf:a b"), ("code", "A-1_~.")]);
-        assert_eq!(request.body.unwrap().1, "grant_type=urn%3Aietf%3Aa%20b&code=A-1_~.");
+        let request = Request::post_form(
+            "https://x/y",
+            &[("grant_type", "urn:ietf:a b"), ("code", "A-1_~.")],
+        );
+        assert_eq!(
+            request.body.unwrap().1,
+            "grant_type=urn%3Aietf%3Aa%20b&code=A-1_~."
+        );
     }
 
     #[test]
     fn headers_are_found_by_lower_case_name() {
-        let response = Response { status: 200, headers: vec![("x-poll-interval".into(), "60".into())], body: String::new() };
+        let response = Response {
+            status: 200,
+            headers: vec![("x-poll-interval".into(), "60".into())],
+            body: String::new(),
+        };
         assert_eq!(response.header("x-poll-interval"), Some("60"));
         assert_eq!(response.header("etag"), None);
     }

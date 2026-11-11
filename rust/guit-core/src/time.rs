@@ -1,19 +1,32 @@
 //! Just enough date handling to show "3h" or "12 Mar" next to a notification.
 //! GitHub sends UTC timestamps such as `2026-01-02T03:04:05Z`.
 
-const MONTHS: [&str; 12] = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const MONTHS: [&str; 12] = [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
 
 /// Seconds since 1970-01-01T00:00:00Z for a GitHub timestamp, or `None` if it is not one.
 pub fn parse_timestamp(text: &str) -> Option<i64> {
     let bytes = text.as_bytes();
-    if bytes.len() < 20 || bytes[4] != b'-' || bytes[7] != b'-' || bytes[10] != b'T' || bytes[13] != b':' || bytes[16] != b':' {
+    if bytes.len() < 20
+        || bytes[4] != b'-'
+        || bytes[7] != b'-'
+        || bytes[10] != b'T'
+        || bytes[13] != b':'
+        || bytes[16] != b':'
+    {
         return None;
     }
 
     let number = |range: std::ops::Range<usize>| text.get(range)?.parse::<i64>().ok();
     let (year, month, day) = (number(0..4)?, number(5..7)?, number(8..10)?);
     let (hour, minute, second) = (number(11..13)?, number(14..16)?, number(17..19)?);
-    if !(1..=12).contains(&month) || !(1..=31).contains(&day) || hour > 23 || minute > 59 || second > 60 {
+    if !(1..=12).contains(&month)
+        || !(1..=31).contains(&day)
+        || hour > 23
+        || minute > 59
+        || second > 60
+    {
         return None;
     }
 
@@ -40,7 +53,11 @@ pub fn relative(then: i64, now: i64) -> String {
     let (year, month, day) = civil_from_days(then.div_euclid(86_400));
     let (this_year, _, _) = civil_from_days(now.div_euclid(86_400));
     let month = MONTHS[(month - 1) as usize];
-    if year == this_year { format!("{day} {month}") } else { format!("{day} {month} {year}") }
+    if year == this_year {
+        format!("{day} {month}")
+    } else {
+        format!("{day} {month} {year}")
+    }
 }
 
 // Howard Hinnant's civil-date algorithms (public domain): exact for the proleptic Gregorian calendar.
@@ -57,11 +74,16 @@ fn civil_from_days(days: i64) -> (i64, i64, i64) {
     let days = days + 719_468;
     let era = days.div_euclid(146_097);
     let day_of_era = days.rem_euclid(146_097);
-    let year_of_era = (day_of_era - day_of_era / 1_460 + day_of_era / 36_524 - day_of_era / 146_096) / 365;
+    let year_of_era =
+        (day_of_era - day_of_era / 1_460 + day_of_era / 36_524 - day_of_era / 146_096) / 365;
     let day_of_year = day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
     let month_index = (5 * day_of_year + 2) / 153;
     let day = day_of_year - (153 * month_index + 2) / 5 + 1;
-    let month = if month_index < 10 { month_index + 3 } else { month_index - 9 };
+    let month = if month_index < 10 {
+        month_index + 3
+    } else {
+        month_index - 9
+    };
     let year = year_of_era + era * 400 + i64::from(month <= 2);
     (year, month, day)
 }
@@ -95,8 +117,17 @@ mod tests {
 
     #[test]
     fn older_dates_show_day_and_month_and_the_year_when_it_differs() {
-        assert_eq!(relative(parse_timestamp("2026-03-12T00:00:00Z").unwrap(), NOW), "12 Mar");
-        assert_eq!(relative(parse_timestamp("2024-03-12T00:00:00Z").unwrap(), NOW), "12 Mar 2024");
-        assert_eq!(relative(parse_timestamp("2025-12-31T23:59:59Z").unwrap(), NOW), "31 Dec 2025");
+        assert_eq!(
+            relative(parse_timestamp("2026-03-12T00:00:00Z").unwrap(), NOW),
+            "12 Mar"
+        );
+        assert_eq!(
+            relative(parse_timestamp("2024-03-12T00:00:00Z").unwrap(), NOW),
+            "12 Mar 2024"
+        );
+        assert_eq!(
+            relative(parse_timestamp("2025-12-31T23:59:59Z").unwrap(), NOW),
+            "31 Dec 2025"
+        );
     }
 }

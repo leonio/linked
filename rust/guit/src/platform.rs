@@ -41,7 +41,8 @@ impl WinRtTransport {
 
     fn try_send(request: &Request) -> Result<Response> {
         let method = HttpMethod::Create(&HSTRING::from(request.method))?;
-        let message = HttpRequestMessage::Create(&method, &Uri::CreateUri(&HSTRING::from(&request.url))?)?;
+        let message =
+            HttpRequestMessage::Create(&method, &Uri::CreateUri(&HSTRING::from(&request.url))?)?;
 
         let headers = message.Headers()?;
         // GitHub rejects requests without a User-Agent.
@@ -62,13 +63,20 @@ impl WinRtTransport {
         let reply = Self::client()?.SendRequestAsync(&message)?.join()?;
         let mut reply_headers = Vec::new();
         for pair in reply.Headers()? {
-            reply_headers.push((pair.Key()?.to_string_lossy().to_ascii_lowercase(), pair.Value()?.to_string_lossy()));
+            reply_headers.push((
+                pair.Key()?.to_string_lossy().to_ascii_lowercase(),
+                pair.Value()?.to_string_lossy(),
+            ));
         }
 
         Ok(Response {
             status: reply.StatusCode()?.0 as u16,
             headers: reply_headers,
-            body: reply.Content()?.ReadAsStringAsync()?.join()?.to_string_lossy(),
+            body: reply
+                .Content()?
+                .ReadAsStringAsync()?
+                .join()?
+                .to_string_lossy(),
         })
     }
 }
@@ -81,14 +89,25 @@ impl Transport for WinRtTransport {
 
 /// The access token kept in the Windows Credential Locker, if there is one.
 pub fn load_token() -> Option<String> {
-    let credential = PasswordVault::new().ok()?.Retrieve(VAULT_RESOURCE, VAULT_USER).ok()?;
+    let credential = PasswordVault::new()
+        .ok()?
+        .Retrieve(VAULT_RESOURCE, VAULT_USER)
+        .ok()?;
     credential.RetrievePassword().ok()?;
-    credential.Password().ok().map(|password| password.to_string_lossy()).filter(|token| !token.is_empty())
+    credential
+        .Password()
+        .ok()
+        .map(|password| password.to_string_lossy())
+        .filter(|token| !token.is_empty())
 }
 
 pub fn save_token(token: &str) {
     _ = (|| -> Result<()> {
-        let credential = PasswordCredential::CreatePasswordCredential(VAULT_RESOURCE, VAULT_USER, &HSTRING::from(token))?;
+        let credential = PasswordCredential::CreatePasswordCredential(
+            VAULT_RESOURCE,
+            VAULT_USER,
+            &HSTRING::from(token),
+        )?;
         PasswordVault::new()?.Add(&credential)
     })();
 }

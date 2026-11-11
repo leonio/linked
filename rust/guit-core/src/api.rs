@@ -30,17 +30,22 @@ impl ApiError {
     pub fn describe(&self) -> String {
         match self {
             Self::Transport(_) => "Could not reach GitHub. Check your connection.".into(),
-            Self::Status { status: 401, .. } => "Your GitHub session has expired. Sign in again.".into(),
-            Self::Status { status: 403 | 429, rate_limited: true } => {
-                "GitHub rate limit reached. Try again in a few minutes.".into()
+            Self::Status { status: 401, .. } => {
+                "Your GitHub session has expired. Sign in again.".into()
             }
+            Self::Status {
+                status: 403 | 429,
+                rate_limited: true,
+            } => "GitHub rate limit reached. Try again in a few minutes.".into(),
             Self::Status { status: 403, .. } => {
                 "GitHub refused this request. The app may need more permissions.".into()
             }
             Self::Status { status: 404, .. } => {
                 "Not found. It may have been deleted, or you may not have access.".into()
             }
-            Self::Status { status: 500.., .. } => "GitHub is having problems. Try again shortly.".into(),
+            Self::Status { status: 500.., .. } => {
+                "GitHub is having problems. Try again shortly.".into()
+            }
             Self::Status { status, .. } => format!("GitHub returned an error ({status})."),
             Self::Decode(_) => "GitHub sent a reply this app does not understand.".into(),
         }
@@ -119,14 +124,25 @@ impl<'a, T: Transport + ?Sized> GitHub<'a, T> {
     }
 
     /// Device flow, step 1: ask for a code the member types on github.com.
-    pub fn request_device_code(&self, client_id: &str, scopes: &str) -> Result<DeviceCode, ApiError> {
-        let request = Request::post_form(format!("{WEB}/login/device/code"), &[("client_id", client_id), ("scope", scopes)])
-            .header("Accept", "application/json");
+    pub fn request_device_code(
+        &self,
+        client_id: &str,
+        scopes: &str,
+    ) -> Result<DeviceCode, ApiError> {
+        let request = Request::post_form(
+            format!("{WEB}/login/device/code"),
+            &[("client_id", client_id), ("scope", scopes)],
+        )
+        .header("Accept", "application/json");
         self.json(&request)
     }
 
     /// Device flow, step 2: ask whether the member has approved yet.
-    pub fn poll_device_token(&self, client_id: &str, device_code: &str) -> Result<DeviceTokenResponse, ApiError> {
+    pub fn poll_device_token(
+        &self,
+        client_id: &str,
+        device_code: &str,
+    ) -> Result<DeviceTokenResponse, ApiError> {
         let request = Request::post_form(
             format!("{WEB}/login/oauth/access_token"),
             &[
@@ -141,7 +157,10 @@ impl<'a, T: Transport + ?Sized> GitHub<'a, T> {
 
     /// operationId: users/get-authenticated
     pub fn user(&self, token: &str) -> Result<User, ApiError> {
-        self.json(&Self::authorized(Request::get(format!("{API}/user")), token))
+        self.json(&Self::authorized(
+            Request::get(format!("{API}/user")),
+            token,
+        ))
     }
 
     /// operationId: activity/list-notifications-for-authenticated-user
@@ -153,20 +172,28 @@ impl<'a, T: Transport + ?Sized> GitHub<'a, T> {
         page: u32,
         per_page: u32,
     ) -> Result<Vec<NotificationThread>, ApiError> {
-        let url = format!("{API}/notifications?all={all}&participating={participating}&page={page}&per_page={per_page}");
+        let url = format!(
+            "{API}/notifications?all={all}&participating={participating}&page={page}&per_page={per_page}"
+        );
         self.json(&Self::authorized(Request::get(url), token))
     }
 
     /// operationId: activity/mark-thread-as-read
     pub fn mark_thread_read(&self, token: &str, thread_id: &str) -> Result<(), ApiError> {
-        let mut request = Self::authorized(Request::get(format!("{API}/notifications/threads/{}", encode(thread_id))), token);
+        let mut request = Self::authorized(
+            Request::get(format!("{API}/notifications/threads/{}", encode(thread_id))),
+            token,
+        );
         request.method = "PATCH";
         self.send(&request).map(|_| ())
     }
 
     /// operationId: activity/mark-thread-as-done
     pub fn mark_thread_done(&self, token: &str, thread_id: &str) -> Result<(), ApiError> {
-        let mut request = Self::authorized(Request::get(format!("{API}/notifications/threads/{}", encode(thread_id))), token);
+        let mut request = Self::authorized(
+            Request::get(format!("{API}/notifications/threads/{}", encode(thread_id))),
+            token,
+        );
         request.method = "DELETE";
         self.send(&request).map(|_| ())
     }
@@ -185,7 +212,8 @@ impl<'a, T: Transport + ?Sized> GitHub<'a, T> {
         } else {
             Err(ApiError::Status {
                 status: response.status,
-                rate_limited: response.status == 429 || response.header("x-ratelimit-remaining") == Some("0"),
+                rate_limited: response.status == 429
+                    || response.header("x-ratelimit-remaining") == Some("0"),
             })
         }
     }
@@ -222,14 +250,19 @@ pub mod testing {
         pub fn reply_with(self, status: u16, body: &str, headers: &[(&str, &str)]) -> Self {
             self.replies.borrow_mut().push_back(Ok(Response {
                 status,
-                headers: headers.iter().map(|(name, value)| (name.to_string(), value.to_string())).collect(),
+                headers: headers
+                    .iter()
+                    .map(|(name, value)| (name.to_string(), value.to_string()))
+                    .collect(),
                 body: body.to_string(),
             }));
             self
         }
 
         pub fn fail(self, message: &str) -> Self {
-            self.replies.borrow_mut().push_back(Err(message.to_string()));
+            self.replies
+                .borrow_mut()
+                .push_back(Err(message.to_string()));
             self
         }
     }
@@ -237,7 +270,10 @@ pub mod testing {
     impl Transport for Canned {
         fn send(&self, request: &Request) -> Result<Response, String> {
             self.sent.borrow_mut().push(request.clone());
-            self.replies.borrow_mut().pop_front().expect("no canned reply left for this request")
+            self.replies
+                .borrow_mut()
+                .pop_front()
+                .expect("no canned reply left for this request")
         }
     }
 }
@@ -259,13 +295,24 @@ mod tests {
     fn notifications_sends_the_query_and_headers_and_maps_nested_objects() {
         let transport = Canned::new().reply(200, THREAD);
 
-        let threads = GitHub::new(&transport).notifications("tok", true, false, 2, 50).unwrap();
+        let threads = GitHub::new(&transport)
+            .notifications("tok", true, false, 2, 50)
+            .unwrap();
 
         let sent = &transport.sent.borrow()[0];
         assert_eq!(sent.method, "GET");
-        assert_eq!(sent.url, "https://api.github.com/notifications?all=true&participating=false&page=2&per_page=50");
-        assert!(sent.headers.contains(&("Authorization", "Bearer tok".to_string())));
-        assert!(sent.headers.contains(&("X-GitHub-Api-Version", API_VERSION.to_string())));
+        assert_eq!(
+            sent.url,
+            "https://api.github.com/notifications?all=true&participating=false&page=2&per_page=50"
+        );
+        assert!(
+            sent.headers
+                .contains(&("Authorization", "Bearer tok".to_string()))
+        );
+        assert!(
+            sent.headers
+                .contains(&("X-GitHub-Api-Version", API_VERSION.to_string()))
+        );
         assert_eq!(threads.len(), 1);
         assert!(threads[0].unread);
         assert_eq!(threads[0].subject.kind, "PullRequest");
@@ -274,10 +321,15 @@ mod tests {
 
     #[test]
     fn a_null_subject_url_is_none() {
-        let body = THREAD.replace(r#""url": "https://api.github.com/repos/octocat/hello/pulls/7""#, r#""url": null"#);
+        let body = THREAD.replace(
+            r#""url": "https://api.github.com/repos/octocat/hello/pulls/7""#,
+            r#""url": null"#,
+        );
         let transport = Canned::new().reply(200, &body);
 
-        let threads = GitHub::new(&transport).notifications("tok", false, false, 1, 50).unwrap();
+        let threads = GitHub::new(&transport)
+            .notifications("tok", false, false, 1, 50)
+            .unwrap();
 
         assert_eq!(threads[0].subject.url, None);
     }
@@ -296,40 +348,78 @@ mod tests {
         assert_eq!(poll.error.as_deref(), Some("authorization_pending"));
         let sent = transport.sent.borrow();
         assert_eq!(sent[0].url, "https://github.com/login/device/code");
-        assert_eq!(sent[0].body.as_ref().unwrap().1, "client_id=id&scope=repo%20read%3Auser");
+        assert_eq!(
+            sent[0].body.as_ref().unwrap().1,
+            "client_id=id&scope=repo%20read%3Auser"
+        );
         assert_eq!(sent[1].url, "https://github.com/login/oauth/access_token");
-        assert!(sent[1].body.as_ref().unwrap().1.contains("grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Adevice_code"));
+        assert!(
+            sent[1]
+                .body
+                .as_ref()
+                .unwrap()
+                .1
+                .contains("grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Adevice_code")
+        );
     }
 
     #[test]
     fn mark_thread_read_patches_the_thread() {
         let transport = Canned::new().reply(205, "");
 
-        GitHub::new(&transport).mark_thread_read("tok", "42").unwrap();
+        GitHub::new(&transport)
+            .mark_thread_read("tok", "42")
+            .unwrap();
 
         let sent = &transport.sent.borrow()[0];
-        assert_eq!((sent.method, sent.url.as_str()), ("PATCH", "https://api.github.com/notifications/threads/42"));
+        assert_eq!(
+            (sent.method, sent.url.as_str()),
+            ("PATCH", "https://api.github.com/notifications/threads/42")
+        );
     }
 
     #[test]
     fn mark_thread_done_deletes_the_thread() {
         let transport = Canned::new().reply(204, "");
 
-        GitHub::new(&transport).mark_thread_done("tok", "42").unwrap();
+        GitHub::new(&transport)
+            .mark_thread_done("tok", "42")
+            .unwrap();
 
         let sent = &transport.sent.borrow()[0];
-        assert_eq!((sent.method, sent.url.as_str()), ("DELETE", "https://api.github.com/notifications/threads/42"));
+        assert_eq!(
+            (sent.method, sent.url.as_str()),
+            ("DELETE", "https://api.github.com/notifications/threads/42")
+        );
     }
 
     #[test]
     fn failures_are_classified_and_described() {
         let cases: [(Canned, &str); 6] = [
-            (Canned::new().reply(401, ""), "Your GitHub session has expired. Sign in again."),
-            (Canned::new().reply_with(403, "", &[("x-ratelimit-remaining", "0")]), "GitHub rate limit reached. Try again in a few minutes."),
-            (Canned::new().reply(403, ""), "GitHub refused this request. The app may need more permissions."),
-            (Canned::new().reply(404, ""), "Not found. It may have been deleted, or you may not have access."),
-            (Canned::new().reply(502, ""), "GitHub is having problems. Try again shortly."),
-            (Canned::new().fail("dns"), "Could not reach GitHub. Check your connection."),
+            (
+                Canned::new().reply(401, ""),
+                "Your GitHub session has expired. Sign in again.",
+            ),
+            (
+                Canned::new().reply_with(403, "", &[("x-ratelimit-remaining", "0")]),
+                "GitHub rate limit reached. Try again in a few minutes.",
+            ),
+            (
+                Canned::new().reply(403, ""),
+                "GitHub refused this request. The app may need more permissions.",
+            ),
+            (
+                Canned::new().reply(404, ""),
+                "Not found. It may have been deleted, or you may not have access.",
+            ),
+            (
+                Canned::new().reply(502, ""),
+                "GitHub is having problems. Try again shortly.",
+            ),
+            (
+                Canned::new().fail("dns"),
+                "Could not reach GitHub. Check your connection.",
+            ),
         ];
         for (transport, expected) in cases {
             let error = GitHub::new(&transport).user("tok").unwrap_err();

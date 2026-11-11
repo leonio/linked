@@ -12,12 +12,21 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use guit_core::api::{ApiError, DeviceCode, GitHub, User};
 use guit_core::device_flow::{DeviceFlowOutcome, wait_for_token};
-use guit_core::inbox::NotificationItem;
+use guit_core::inbox::{Filter, Inbox, Kind, NotificationItem, PageRequest, Removed};
 use guit_core::{GITHUB_CLIENT_ID, GITHUB_SCOPES};
 use platform::WinRtTransport;
 use windows_reactor::*;
 
-const PAGE_SIZE: u32 = 50;
+/// How often the inbox checks for changes in the background.
+const POLL_PERIOD: Duration = Duration::from_secs(60);
+
+/// Why a page was fetched, so its reply goes to the right place.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Purpose {
+    FirstPage,
+    NextPage,
+    Refresh,
+}
 
 /// Everything that can happen. Messages cross threads (background work answers with one), so they own their data.
 #[derive(Clone)]
@@ -29,10 +38,22 @@ enum Message {
     OpenVerificationPage,
     SignOut,
     UserLoaded(Option<User>),
-    ShowUnread(bool),
-    Refresh,
-    InboxLoaded { generation: u64, result: Result<Vec<NotificationItem>, ApiError> },
-    Open(usize),
+    FilterSelected(Filter),
+    KindSelected(Option<usize>),
+    Reload,
+    LoadMore,
+    PollTick,
+    PageLoaded {
+        generation: u64,
+        purpose: Purpose,
+        result: Result<Vec<NotificationItem>, ApiError>,
+    },
+    Open(Option<usize>),
+    MarkDone(String),
+    MarkDoneFinished {
+        id: String,
+        error: Option<String>,
+    },
 }
 
 /// The sign-in view's state.
@@ -50,13 +71,13 @@ struct SignIn {
 struct Shell {
     token: String,
     login: String,
-    /// True shows only unread notifications; false shows all.
-    unread_only: bool,
-    items: Rc<Vec<Rc<NotificationItem>>>,
-    loading: bool,
+    /// The inbox's rows and rules; see `guit_core::inbox::Inbox`.
+    inbox: Inbox,
     error: Option<String>,
-    /// Bumped by every load, so the reply of a superseded load is ignored.
-    generation: u64,
+    /// Rows taken out by "mark as done" whose request is still in flight, kept to put back on failure.
+    pending_done: Vec<Removed>,
+    /// The background refresh. Dropping it cancels the next tick.
+    poll: Option<ComponentTimer>,
 }
 
 enum Session {
@@ -69,37 +90,28 @@ struct Guit {
 }
 
 fn now() -> i64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |elapsed| elapsed.as_secs() as i64)
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |elapsed| elapsed.as_secs() as i64)
 }
 
 impl Guit {
     fn enter_shell(&mut self, token: String, context: &ComponentContext<Self>) {
         let user_token = token.clone();
-        _ = context.spawn_background(move |_| Message::UserLoaded(GitHub::new(&WinRtTransport).user(&user_token).ok()));
+        _ = context.spawn_background(move |_| {
+            Message::UserLoaded(GitHub::new(&WinRtTransport).user(&user_token).ok())
+        });
+
+        let mut inbox = Inbox::default();
+        let first = inbox.begin_load();
+        fetch(context, &token, first, Purpose::FirstPage);
         self.session = Session::SignedIn(Shell {
             token,
             login: String::new(),
-            unread_only: true,
-            items: Rc::new(Vec::new()),
-            loading: false,
+            inbox,
             error: None,
-            generation: 0,
-        });
-        self.load_inbox(context);
-    }
-
-    fn load_inbox(&mut self, context: &ComponentContext<Self>) {
-        let Session::SignedIn(shell) = &mut self.session else { return };
-        shell.generation += 1;
-        shell.loading = true;
-        shell.error = None;
-        let (generation, token, all) = (shell.generation, shell.token.clone(), !shell.unread_only);
-        _ = context.spawn_background(move |_| {
-            let result = GitHub::new(&WinRtTransport).notifications(&token, all, false, 1, PAGE_SIZE).map(|threads| {
-                let now = now();
-                threads.iter().map(|thread| NotificationItem::from_thread(thread, now)).collect()
-            });
-            Message::InboxLoaded { generation, result }
+            pending_done: Vec::new(),
+            poll: Some(context.set_timeout(POLL_PERIOD, Message::PollTick)),
         });
     }
 
@@ -109,12 +121,41 @@ impl Guit {
     }
 }
 
+/// Fetches one page of notifications off the UI thread and reports back with `Message::PageLoaded`.
+fn fetch(context: &ComponentContext<Guit>, token: &str, request: PageRequest, purpose: Purpose) {
+    let token = token.to_string();
+    _ = context.spawn_background(move |_| {
+        let result = GitHub::new(&WinRtTransport)
+            .notifications(
+                &token,
+                request.all,
+                request.participating,
+                request.page,
+                request.per_page,
+            )
+            .map(|threads| {
+                let now = now();
+                threads
+                    .iter()
+                    .map(|thread| NotificationItem::from_thread(thread, now))
+                    .collect()
+            });
+        Message::PageLoaded {
+            generation: request.generation,
+            purpose,
+            result,
+        }
+    });
+}
+
 impl Component for Guit {
     type Input = ();
     type Message = Message;
 
     fn create(_input: &(), context: &ComponentContext<Self>) -> Self {
-        let mut app = Self { session: Session::SignedOut(SignIn::default()) };
+        let mut app = Self {
+            session: Session::SignedOut(SignIn::default()),
+        };
         if let Some(token) = platform::load_token() {
             app.enter_shell(token, context);
         }
@@ -152,26 +193,44 @@ impl Component for Guit {
                         !cancel.is_cancelled()
                     };
                     Message::SignInFinished(
-                        wait_for_token(&GitHub::new(&WinRtTransport), GITHUB_CLIENT_ID, &code, sleep)
-                            .map_err(|error| error.describe()),
+                        wait_for_token(
+                            &GitHub::new(&WinRtTransport),
+                            GITHUB_CLIENT_ID,
+                            &code,
+                            sleep,
+                        )
+                        .map_err(|error| error.describe()),
                     )
                 }));
             }
             (Session::SignedOut(sign_in), Message::DeviceCodeReady(Err(error))) => {
-                *sign_in = SignIn { error: Some(error), ..SignIn::default() };
+                *sign_in = SignIn {
+                    error: Some(error),
+                    ..SignIn::default()
+                };
             }
-            (Session::SignedOut(_), Message::SignInFinished(Ok(DeviceFlowOutcome::Authorized(token)))) => {
+            (
+                Session::SignedOut(_),
+                Message::SignInFinished(Ok(DeviceFlowOutcome::Authorized(token))),
+            ) => {
                 platform::save_token(&token);
                 self.enter_shell(token, context);
             }
             (Session::SignedOut(sign_in), Message::SignInFinished(outcome)) => {
                 let error = match outcome {
-                    Ok(DeviceFlowOutcome::Denied) => Some("Sign-in was cancelled on github.com.".to_string()),
-                    Ok(DeviceFlowOutcome::Expired) => Some("The code expired. Try again.".to_string()),
+                    Ok(DeviceFlowOutcome::Denied) => {
+                        Some("Sign-in was cancelled on github.com.".to_string())
+                    }
+                    Ok(DeviceFlowOutcome::Expired) => {
+                        Some("The code expired. Try again.".to_string())
+                    }
                     Err(error) => Some(error),
                     Ok(_) => None,
                 };
-                *sign_in = SignIn { error, ..SignIn::default() };
+                *sign_in = SignIn {
+                    error,
+                    ..SignIn::default()
+                };
             }
             (Session::SignedOut(sign_in), Message::CancelSignIn) => {
                 if let Some(task) = sign_in.task.take() {
@@ -186,27 +245,104 @@ impl Component for Guit {
             // ---- signed in: the shell and the inbox ------------------------------------------
             (Session::SignedIn(_), Message::SignOut) => self.sign_out(),
             (Session::SignedIn(shell), Message::UserLoaded(Some(user))) => shell.login = user.login,
-            (Session::SignedIn(shell), Message::ShowUnread(unread_only)) if shell.unread_only != unread_only => {
-                shell.unread_only = unread_only;
-                self.load_inbox(context);
-            }
-            (Session::SignedIn(_), Message::Refresh) => self.load_inbox(context),
-            (Session::SignedIn(shell), Message::InboxLoaded { generation, result }) if generation == shell.generation => {
-                shell.loading = false;
-                match result {
-                    Ok(items) => shell.items = Rc::new(items.into_iter().map(Rc::new).collect()),
-                    // A rejected token ends the session, as in the C# app.
-                    Err(error) if error.is_unauthorized() => self.sign_out(),
-                    Err(error) => shell.error = Some(error.describe()),
+            (Session::SignedIn(shell), Message::FilterSelected(filter)) => {
+                if let Some(request) = shell.inbox.set_filter(filter) {
+                    shell.error = None;
+                    fetch(context, &shell.token, request, Purpose::FirstPage);
                 }
             }
-            (Session::SignedIn(shell), Message::Open(index)) => {
-                if let Some(item) = shell.items.get(index) {
+            (Session::SignedIn(shell), Message::KindSelected(Some(index))) => {
+                shell
+                    .inbox
+                    .set_kind(Kind::ALL.get(index).copied().unwrap_or_default());
+                if let Some(request) = shell.inbox.top_up() {
+                    fetch(context, &shell.token, request, Purpose::NextPage);
+                }
+            }
+            (Session::SignedIn(shell), Message::Reload) => {
+                shell.error = None;
+                let request = shell.inbox.begin_load();
+                fetch(context, &shell.token, request, Purpose::FirstPage);
+            }
+            (Session::SignedIn(shell), Message::LoadMore) => {
+                if let Some(request) = shell.inbox.begin_load_more() {
+                    fetch(context, &shell.token, request, Purpose::NextPage);
+                }
+            }
+            (Session::SignedIn(shell), Message::PollTick) => {
+                shell.poll = Some(context.set_timeout(POLL_PERIOD, Message::PollTick));
+                if let Some(request) = shell.inbox.refresh_request() {
+                    fetch(context, &shell.token, request, Purpose::Refresh);
+                }
+            }
+            (
+                Session::SignedIn(shell),
+                Message::PageLoaded {
+                    generation,
+                    purpose,
+                    result,
+                },
+            ) => match result {
+                Ok(items) => {
+                    let applied = match purpose {
+                        Purpose::FirstPage => shell.inbox.first_page_loaded(generation, items),
+                        Purpose::NextPage => shell.inbox.more_loaded(generation, items),
+                        Purpose::Refresh => shell.inbox.refreshed(generation, items),
+                    };
+                    // With a kind filter on, keep fetching (a bounded number of pages) until the list is comfortably full.
+                    if applied && let Some(request) = shell.inbox.top_up() {
+                        fetch(context, &shell.token, request, Purpose::NextPage);
+                    }
+                }
+                // A rejected token ends the session, as in the C# app.
+                Err(error) if error.is_unauthorized() => self.sign_out(),
+                // A background refresh that fails says nothing; the next one, or a reload, will report it.
+                Err(_) if purpose == Purpose::Refresh => {}
+                Err(error) => {
+                    if shell.inbox.load_failed(generation) {
+                        shell.error = Some(error.describe());
+                    }
+                }
+            },
+            (Session::SignedIn(shell), Message::Open(Some(index))) => {
+                if let Some(item) = shell.inbox.visible().get(index).cloned() {
                     platform::open_in_browser(&item.web_url);
                     if item.unread {
+                        shell.inbox.mark_read(&item.id);
                         let (token, id) = (shell.token.clone(), item.id.clone());
                         // Best effort: the next refresh shows the truth either way.
-                        std::thread::spawn(move || _ = GitHub::new(&WinRtTransport).mark_thread_read(&token, &id));
+                        std::thread::spawn(move || {
+                            _ = GitHub::new(&WinRtTransport).mark_thread_read(&token, &id)
+                        });
+                    }
+                }
+            }
+            (Session::SignedIn(shell), Message::MarkDone(id)) => {
+                // Optimistic: the row goes at once and comes back if GitHub refuses.
+                if let Some(removed) = shell.inbox.remove(&id) {
+                    shell.pending_done.push(removed);
+                    let token = shell.token.clone();
+                    _ = context.spawn_background(move |_| {
+                        match GitHub::new(&WinRtTransport).mark_thread_done(&token, &id) {
+                            Ok(()) => Message::MarkDoneFinished { id, error: None },
+                            Err(error) => Message::MarkDoneFinished {
+                                id,
+                                error: Some(error.describe()),
+                            },
+                        }
+                    });
+                }
+            }
+            (Session::SignedIn(shell), Message::MarkDoneFinished { id, error }) => {
+                if let Some(position) = shell
+                    .pending_done
+                    .iter()
+                    .position(|removed| removed.id() == id)
+                {
+                    let removed = shell.pending_done.remove(position);
+                    if let Some(error) = error {
+                        shell.inbox.restore(removed);
+                        shell.error = Some(error);
                     }
                 }
             }
@@ -228,7 +364,11 @@ impl Component for Guit {
 
 fn sign_in_view(sign_in: &SignIn, context: &ViewContext<Guit>) -> View {
     let mut children: Vec<View> = vec![
-        TextBlock::new().text("Sign in to GitHub").font_size(28.0).horizontal_alignment(HorizontalAlignment::Center).into(),
+        TextBlock::new()
+            .text("Sign in to GitHub")
+            .font_size(28.0)
+            .horizontal_alignment(HorizontalAlignment::Center)
+            .into(),
     ];
 
     match &sign_in.user_code {
@@ -249,7 +389,11 @@ fn sign_in_view(sign_in: &SignIn, context: &ViewContext<Guit>) -> View {
                     .into(),
             );
             children.push(
-                TextBlock::new().text(code.as_str()).font_size(40.0).horizontal_alignment(HorizontalAlignment::Center).into(),
+                TextBlock::new()
+                    .text(code.as_str())
+                    .font_size(40.0)
+                    .horizontal_alignment(HorizontalAlignment::Center)
+                    .into(),
             );
             children.push(ProgressBar::new().is_indeterminate(true).into());
             children.push(
@@ -261,7 +405,9 @@ fn sign_in_view(sign_in: &SignIn, context: &ViewContext<Guit>) -> View {
                         HyperlinkButton::new()
                             .content("Open github.com again")
                             .on_click(context.message(Message::OpenVerificationPage)),
-                        Button::new().content("Cancel").on_click(context.message(Message::CancelSignIn)),
+                        Button::new()
+                            .content("Cancel")
+                            .on_click(context.message(Message::CancelSignIn)),
                     ))
                     .into(),
             );
@@ -282,8 +428,16 @@ fn sign_in_view(sign_in: &SignIn, context: &ViewContext<Guit>) -> View {
 }
 
 fn shell_view(shell: &Shell, context: &ViewContext<Guit>) -> View {
+    let inbox = &shell.inbox;
+    let filter = inbox.filter();
     let header = Grid::new()
-        .columns([GridLength::Auto, GridLength::STAR, GridLength::Auto, GridLength::Auto])
+        .columns([
+            GridLength::Auto,
+            GridLength::STAR,
+            GridLength::Auto,
+            GridLength::Auto,
+            GridLength::Auto,
+        ])
         .column_spacing(16.0)
         .margin(Thickness::new(24.0, 16.0, 24.0, 8.0))
         .children((
@@ -292,35 +446,60 @@ fn shell_view(shell: &Shell, context: &ViewContext<Guit>) -> View {
                 .grid_column(1)
                 .vertical_alignment(VerticalAlignment::Bottom)
                 .items((
-                    SelectorBarItem::new().text("Unread").is_selected(shell.unread_only),
-                    SelectorBarItem::new().text("All").is_selected(!shell.unread_only),
+                    SelectorBarItem::new()
+                        .text("Unread")
+                        .is_selected(filter == Filter::Unread),
+                    SelectorBarItem::new()
+                        .text("All")
+                        .is_selected(filter == Filter::All),
+                    SelectorBarItem::new()
+                        .text("Participating")
+                        .is_selected(filter == Filter::Participating),
                 ))
                 .on_selected_text_changed(context.callback(|text: Option<Rc<str>>| {
-                    Message::ShowUnread(text.as_deref() != Some("All"))
+                    Message::FilterSelected(match text.as_deref() {
+                        Some("All") => Filter::All,
+                        Some("Participating") => Filter::Participating,
+                        _ => Filter::Unread,
+                    })
                 })),
-            Button::new()
+            // The items are in the order of Kind::ALL, so the selected index is the kind.
+            ComboBox::new()
                 .grid_column(2)
                 .vertical_alignment(VerticalAlignment::Center)
-                .content(FontIcon::new().glyph("\u{E72C}").font_size(16.0))
-                .on_click(context.message(Message::Refresh)),
+                .automation_name("Kind of notification")
+                .items_source(Kind::ALL.map(Kind::label))
+                .selected_index(Kind::ALL.iter().position(|kind| *kind == inbox.kind()))
+                .on_selection_changed(context.callback(Message::KindSelected)),
             Button::new()
                 .grid_column(3)
                 .vertical_alignment(VerticalAlignment::Center)
-                .content(if shell.login.is_empty() { "Sign out".to_string() } else { format!("Sign out {}", shell.login) })
+                .automation_name("Refresh")
+                .content(FontIcon::new().glyph("\u{E72C}").font_size(16.0))
+                .on_click(context.message(Message::Reload)),
+            Button::new()
+                .grid_column(4)
+                .vertical_alignment(VerticalAlignment::Center)
+                .content(if shell.login.is_empty() {
+                    "Sign out".to_string()
+                } else {
+                    format!("Sign out {}", shell.login)
+                })
                 .on_click(context.message(Message::SignOut)),
         ));
 
+    let rows = inbox.visible();
     let list = ListView::new()
         .selection_mode(ListViewSelectionMode::Single)
-        .on_selection_changed(context.callback(|index: Option<usize>| index.map_or(Message::Refresh, Message::Open)))
-        .items(shell.items.iter().map(|item| DataItem::new(item.id.as_str(), item.title.as_str()).content(row(item))));
+        .on_selection_changed(context.callback(Message::Open))
+        .items(rows.iter().map(|item| {
+            DataItem::new(item.id.as_str(), item.title.as_str()).content(row(item, context))
+        }));
 
     let mut layers: Vec<View> = vec![list.into()];
-    if shell.loading {
+    if inbox.is_loading() {
         layers.push(ProgressRing::new().is_active(true).into());
-    } else if let Some(error) = &shell.error {
-        layers.push(error_bar(error).vertical_alignment(VerticalAlignment::Top).margin(Thickness::new(24.0, 0.0, 24.0, 0.0)).into());
-    } else if shell.items.is_empty() {
+    } else if rows.is_empty() && shell.error.is_none() {
         layers.push(
             TextBlock::new()
                 .text("You're all caught up")
@@ -331,42 +510,101 @@ fn shell_view(shell: &Shell, context: &ViewContext<Guit>) -> View {
                 .into(),
         );
     }
+    if let Some(error) = &shell.error {
+        layers.push(
+            error_bar(error)
+                .vertical_alignment(VerticalAlignment::Top)
+                .margin(Thickness::new(24.0, 0.0, 24.0, 0.0))
+                .into(),
+        );
+    }
 
-    let page = Grid::new().rows([GridLength::Auto, GridLength::STAR]).children((header, Grid::new().grid_row(1).children(layers)));
+    // The C# app loads the next page as the list nears its end; reactor's ListView has no event for that yet,
+    // so the next page is one click away instead.
+    let footer: View = if inbox.is_loading_more() {
+        ProgressBar::new().grid_row(2).is_indeterminate(true).into()
+    } else if inbox.has_more() {
+        Button::new()
+            .grid_row(2)
+            .margin(Thickness::new(24.0, 8.0, 24.0, 12.0))
+            .horizontal_alignment(HorizontalAlignment::Center)
+            .content("Load more")
+            .on_click(context.message(Message::LoadMore))
+            .into()
+    } else {
+        Grid::new().grid_row(2).into()
+    };
+
+    let page = Grid::new()
+        .rows([GridLength::Auto, GridLength::STAR, GridLength::Auto])
+        .children((header, Grid::new().grid_row(1).children(layers), footer));
 
     NavigationView::new()
         .pane_display_mode(NavigationViewPaneDisplayMode::LeftCompact)
         .is_back_button_visible(NavigationViewBackButtonVisible::Collapsed)
         .is_settings_visible(false)
-        .menu_items((NavigationViewItem::new().tag("inbox").content("Inbox").icon(Symbol::Mail).is_selected(true),))
+        .menu_items((NavigationViewItem::new()
+            .tag("inbox")
+            .content("Inbox")
+            .icon(Symbol::Mail)
+            .is_selected(true),))
         .content(page)
         .into()
 }
 
-/// One inbox row: an icon for the kind, the title over "repository · reason", and the age.
-fn row(item: &NotificationItem) -> View {
+/// One inbox row: an icon for the kind, the title over "repository · reason", the age, and "mark as done".
+fn row(item: &NotificationItem, context: &ViewContext<Guit>) -> View {
     Grid::new()
-        .columns([GridLength::Auto, GridLength::STAR, GridLength::Auto])
+        .columns([
+            GridLength::Auto,
+            GridLength::STAR,
+            GridLength::Auto,
+            GridLength::Auto,
+        ])
         .column_spacing(12.0)
         .height(56.0)
         .opacity(if item.unread { 1.0 } else { 0.55 })
         .children((
-            FontIcon::new().glyph(item.glyph).font_size(16.0).vertical_alignment(VerticalAlignment::Center),
-            StackPanel::new().grid_column(1).vertical_alignment(VerticalAlignment::Center).children((
-                TextBlock::new().text(item.title.as_str()).font_weight(FontWeight::SEMI_BOLD).text_trimming(TextTrimming::CharacterEllipsis),
-                TextBlock::new()
-                    .text(format!("{} \u{00B7} {}", item.repository, item.reason))
-                    .font_size(12.0)
-                    .opacity(0.7)
-                    .text_trimming(TextTrimming::CharacterEllipsis),
-            )),
-            TextBlock::new().text(item.updated.as_str()).grid_column(2).font_size(12.0).opacity(0.7).vertical_alignment(VerticalAlignment::Center),
+            FontIcon::new()
+                .glyph(item.glyph)
+                .font_size(16.0)
+                .vertical_alignment(VerticalAlignment::Center),
+            StackPanel::new()
+                .grid_column(1)
+                .vertical_alignment(VerticalAlignment::Center)
+                .children((
+                    TextBlock::new()
+                        .text(item.title.as_str())
+                        .font_weight(FontWeight::SEMI_BOLD)
+                        .text_trimming(TextTrimming::CharacterEllipsis),
+                    TextBlock::new()
+                        .text(format!("{} \u{00B7} {}", item.repository, item.reason))
+                        .font_size(12.0)
+                        .opacity(0.7)
+                        .text_trimming(TextTrimming::CharacterEllipsis),
+                )),
+            TextBlock::new()
+                .text(item.updated.as_str())
+                .grid_column(2)
+                .font_size(12.0)
+                .opacity(0.7)
+                .vertical_alignment(VerticalAlignment::Center),
+            Button::new()
+                .grid_column(3)
+                .vertical_alignment(VerticalAlignment::Center)
+                .automation_name("Mark as done")
+                .content(FontIcon::new().glyph("\u{E73E}").font_size(14.0))
+                .on_click(context.message(Message::MarkDone(item.id.clone()))),
         ))
         .into()
 }
 
 fn error_bar(message: &str) -> InfoBar {
-    InfoBar::new().is_open(true).is_closable(false).severity(InfoBarSeverity::Error).message(message)
+    InfoBar::new()
+        .is_open(true)
+        .is_closable(false)
+        .severity(InfoBarSeverity::Error)
+        .message(message)
 }
 
 fn main() {

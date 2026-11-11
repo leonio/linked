@@ -38,7 +38,8 @@ impl NotificationItem {
             reason: thread.reason.replace('_', " "),
             glyph: glyph_for(&thread.subject.kind),
             avatar_url: small_avatar(&thread.repository.owner.avatar_url),
-            updated: time::parse_timestamp(&thread.updated_at).map_or_else(String::new, |then| time::relative(then, now)),
+            updated: time::parse_timestamp(&thread.updated_at)
+                .map_or_else(String::new, |then| time::relative(then, now)),
             unread: thread.unread,
             web_url,
         }
@@ -89,8 +90,15 @@ pub enum Kind {
 
 impl Kind {
     /// In the order the kind box lists them.
-    pub const ALL: [Self; 7] =
-        [Self::All, Self::PullRequests, Self::Issues, Self::Releases, Self::Discussions, Self::Checks, Self::Other];
+    pub const ALL: [Self; 7] = [
+        Self::All,
+        Self::PullRequests,
+        Self::Issues,
+        Self::Releases,
+        Self::Discussions,
+        Self::Checks,
+        Self::Other,
+    ];
 
     pub fn label(self) -> &'static str {
         match self {
@@ -105,7 +113,14 @@ impl Kind {
     }
 
     fn matches(self, item: &NotificationItem) -> bool {
-        const NAMED: [&str; 6] = ["PullRequest", "Issue", "Release", "Discussion", "CheckSuite", "WorkflowRun"];
+        const NAMED: [&str; 6] = [
+            "PullRequest",
+            "Issue",
+            "Release",
+            "Discussion",
+            "CheckSuite",
+            "WorkflowRun",
+        ];
         match self {
             Self::All => true,
             Self::PullRequests => item.kind == "PullRequest",
@@ -288,7 +303,11 @@ impl Inbox {
     /// A background refresh fetched the first page again. Replaces the list only if something changed,
     /// so an unchanged inbox keeps its rows. Returns true if it changed.
     pub fn refreshed(&mut self, generation: u64, items: Vec<NotificationItem>) -> bool {
-        if generation != self.generation || self.loading || self.loading_more || self.same_as_first_page(&items) {
+        if generation != self.generation
+            || self.loading
+            || self.loading_more
+            || self.same_as_first_page(&items)
+        {
             return false;
         }
 
@@ -306,7 +325,9 @@ impl Inbox {
 
     /// Marks a row as read at once. Under the Unread filter the row leaves the list.
     pub fn mark_read(&mut self, id: &str) {
-        let Some(index) = self.all.iter().position(|item| item.id == id) else { return };
+        let Some(index) = self.all.iter().position(|item| item.id == id) else {
+            return;
+        };
         if !self.all[index].unread {
             return;
         }
@@ -348,17 +369,27 @@ impl Inbox {
 
     fn rebuild(&mut self) {
         let kind = self.kind;
-        self.visible = Rc::new(self.all.iter().filter(|item| kind.matches(item)).cloned().collect());
+        self.visible = Rc::new(
+            self.all
+                .iter()
+                .filter(|item| kind.matches(item))
+                .cloned()
+                .collect(),
+        );
         self.revision += 1;
     }
 
     fn same_as_first_page(&self, page: &[NotificationItem]) -> bool {
         let page_size = Self::PAGE_SIZE as usize;
-        if page.len() > self.all.len() || (self.all.len() <= page_size && self.all.len() != page.len()) {
+        if page.len() > self.all.len()
+            || (self.all.len() <= page_size && self.all.len() != page.len())
+        {
             return false;
         }
 
-        page.iter().zip(&self.all).all(|(new, old)| new.id == old.id && new.unread == old.unread)
+        page.iter()
+            .zip(&self.all)
+            .all(|(new, old)| new.id == old.id && new.unread == old.unread)
     }
 }
 
@@ -376,7 +407,11 @@ mod tests {
             unread: true,
             reason: "review_requested".into(),
             updated_at: "2026-06-15T09:00:00Z".into(),
-            subject: NotificationSubject { title: "Fix it".into(), kind: kind.into(), url: url.map(str::to_string) },
+            subject: NotificationSubject {
+                title: "Fix it".into(),
+                kind: kind.into(),
+                url: url.map(str::to_string),
+            },
             repository: RepositorySummary {
                 full_name: "octocat/hello".into(),
                 html_url: "https://github.com/octocat/hello".into(),
@@ -392,14 +427,23 @@ mod tests {
 
     #[test]
     fn every_display_value_is_mapped() {
-        let item = NotificationItem::from_thread(&thread("PullRequest", Some("https://api.github.com/repos/octocat/hello/pulls/7")), NOW);
+        let item = NotificationItem::from_thread(
+            &thread(
+                "PullRequest",
+                Some("https://api.github.com/repos/octocat/hello/pulls/7"),
+            ),
+            NOW,
+        );
 
         assert_eq!(item.id, "42");
         assert_eq!(item.title, "Fix it");
         assert_eq!(item.repository, "octocat/hello");
         assert_eq!(item.reason, "review requested");
         assert_eq!(item.glyph, "\u{E8AB}");
-        assert_eq!(item.avatar_url, "https://avatars.githubusercontent.com/u/1?v=4&s=64");
+        assert_eq!(
+            item.avatar_url,
+            "https://avatars.githubusercontent.com/u/1?v=4&s=64"
+        );
         assert_eq!(item.updated, "3h");
         assert!(item.unread);
         assert_eq!(item.web_url, "https://github.com/octocat/hello/pull/7");
@@ -431,7 +475,11 @@ mod tests {
     }
 
     fn ids(inbox: &Inbox) -> Vec<&str> {
-        inbox.visible().iter().map(|item| item.id.as_str()).collect()
+        inbox
+            .visible()
+            .iter()
+            .map(|item| item.id.as_str())
+            .collect()
     }
 
     fn loaded(pages: Vec<NotificationItem>) -> Inbox {
@@ -446,7 +494,15 @@ mod tests {
         let mut inbox = Inbox::default();
 
         let request = inbox.begin_load();
-        assert_eq!((request.all, request.participating, request.page, request.per_page), (false, false, 1, 50));
+        assert_eq!(
+            (
+                request.all,
+                request.participating,
+                request.page,
+                request.per_page
+            ),
+            (false, false, 1, 50)
+        );
         assert!(inbox.is_loading());
 
         assert!(inbox.first_page_loaded(request.generation, items(1, 3, "Issue")));
@@ -464,7 +520,10 @@ mod tests {
         assert_eq!((all.all, all.participating), (true, false));
 
         let participating = inbox.set_filter(Filter::Participating).unwrap();
-        assert_eq!((participating.all, participating.participating), (false, true));
+        assert_eq!(
+            (participating.all, participating.participating),
+            (false, true)
+        );
     }
 
     #[test]
@@ -624,8 +683,14 @@ mod tests {
 
     #[test]
     fn small_avatar_appends_the_size_parameter() {
-        assert_eq!(small_avatar("https://avatars/u/1"), "https://avatars/u/1?s=64");
-        assert_eq!(small_avatar("https://avatars/u/1?v=4"), "https://avatars/u/1?v=4&s=64");
+        assert_eq!(
+            small_avatar("https://avatars/u/1"),
+            "https://avatars/u/1?s=64"
+        );
+        assert_eq!(
+            small_avatar("https://avatars/u/1?v=4"),
+            "https://avatars/u/1?v=4&s=64"
+        );
         assert_eq!(small_avatar(""), "");
     }
 }
