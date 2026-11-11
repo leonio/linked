@@ -76,6 +76,9 @@ Check(true, "actions api: rerun");
 RunsViewModel runsViewModel = provider.GetRequiredService<RunsViewModel>();
 await runsViewModel.LoadRepositoriesCommand.ExecuteAsync(null);
 Check(runsViewModel is { SelectedRepository: "octocat/hello", Runs: [{ StatusKind: "running", Detail: "CI #12 \u00B7 push \u00B7 main" }] }, "runs view model");
+JobsViewModel jobsViewModel = provider.GetRequiredService<JobsViewModel>();
+await jobsViewModel.LoadCommand.ExecuteAsync("octocat/hello@30433642");
+Check(jobsViewModel is { Title: "Fix it", StatusKind: "running", Jobs: [{ Name: "build", Duration: "2m 05s" }] }, "jobs view model");
 
 InboxViewModel inbox = provider.GetRequiredService<InboxViewModel>();
 await inbox.LoadCommand.ExecuteAsync(null);
