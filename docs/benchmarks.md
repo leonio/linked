@@ -31,11 +31,38 @@ before/after needs the same commit built on both, which was not done.
 
 CI now fails if the start-up median goes over 400 ms on x64 or 600 ms on ARM64.
 
+## C# and Rust, side by side
+
+Both apps built at the same commit by the manually started workflow (`.github/workflows/release.yml`, run
+43049293921, 11 November 2026) and measured one after the other **on the same runner** with
+`tools/measure-startup.ps1`. Both start signed out, so this is each app's shell and sign-in view.
+
+| Runner | App | Start-up median (min-max) | Working set | Executable | App folder | Zip |
+|---|---|---|---|---|---|---|
+| x64 | C# (.NET 11 Native AOT, WinUI 3) | 160 ms (152-189) | 77 MB | 13.9 MB | 132.8 MB | 53.2 MB |
+| x64 | Rust (windows-reactor) | 139 ms (132-151) | 66 MB | 1.9 MB | 60.0 MB | 23.6 MB |
+| ARM64 | C# | 339 ms (153-416) | 85 MB | 14.1 MB | 141.5 MB | 52.3 MB |
+| ARM64 | Rust | 143 ms (138-153) | 77 MB | 1.9 MB | 67.3 MB | 23.5 MB |
+
+How to read this:
+
+- **x64 start-up is close**: Rust is about 20 ms (13%) faster in this run. In the ordinary CI run just before
+  it, on separate machines, C# measured 141 ms and Rust 154 ms. The gap is inside the variation between runs,
+  so on x64 the honest summary is "about the same".
+- **ARM64 start-up differs more, and C# is erratic there**: its five runs ranged from 153 to 416 ms, while Rust
+  stayed within 138-153 ms. One run is not enough to call it; it is the first thing to repeat.
+- **Size is the clear difference**: the Rust executable is 1.9 MB against 13.9 MB, and its folder is less than
+  half the size. Most of both folders is the Windows App Runtime that each app carries; the C# folder also
+  carries more of the Windows App SDK than the Rust one.
+- **Working set**: Rust uses about 10 MB less at the sign-in view.
+- **This is not yet a like-for-like app**: the Rust app has sign-in and a basic inbox; the C# app has much more.
+  More features mean more code to load, so expect the C# start-up figure to be the more "finished" one.
+  Only the signed-out start is comparable today.
+
 ## Not measured yet
 
 - **Anything after sign-in**: time to a filled inbox, memory with a few hundred notifications loaded, scrolling
   frame times. CI cannot sign in. These need a Windows machine, a signed-in account and Windows Performance Recorder.
 - **A laptop**: the budget in the `performance` skill (under 400 ms) was written for one; only CI machines have been timed.
-- **C++/WinRT**: the comparison this project exists for (plan card 5.8). It needs the same page built as a C++/WinRT
-  WinUI 3 app and measured on the same machine with the method above. The four rows above are the C# half.
+- **The signed-in comparison**: both apps showing the same inbox on the same machine (plan card 6.10).
 - **CsWinRT 3**: expected to cut size and start-up further; it was still a preview when this was written (card 5.7b).
