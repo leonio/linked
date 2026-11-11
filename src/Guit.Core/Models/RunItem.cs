@@ -39,6 +39,9 @@ public sealed partial class RunItem
 
     public string StatusGlyph { get; }
 
+    /// <summary>What a screen reader announces for this row (a ListView reads an item through ToString).</summary>
+    public override string ToString() => $"{Title}, {StatusKind}, {Detail}, {Updated}";
+
     public static RunItem From(WorkflowRun run, DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(run);
@@ -96,6 +99,10 @@ public sealed partial class JobItem
     public string Duration { get; }
 
     public string WebUrl { get; }
+
+    /// <summary>What a screen reader announces for this row (a ListView reads an item through ToString).</summary>
+    public override string ToString()
+        => $"{(IsStep ? "Step" : "Job")} {Name}, {StatusKind}{(Duration.Length > 0 && Duration != StatusKind ? ", " + Duration : string.Empty)}";
 
     public static JobItem From(Job job)
     {

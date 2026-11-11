@@ -46,6 +46,10 @@ public sealed partial class NotificationItem : ObservableObject
     [ObservableProperty]
     public partial bool IsUnread { get; set; }
 
+    /// <summary>What a screen reader announces for this row (a ListView reads an item through ToString).</summary>
+    public override string ToString()
+        => $"{Title}, {Repository}, {Reason}, {Updated}, {(IsUnread ? "unread" : "read")}";
+
     public static NotificationItem From(NotificationThread thread, DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(thread);

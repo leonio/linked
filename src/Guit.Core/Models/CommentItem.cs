@@ -98,6 +98,10 @@ public sealed partial class CommentItem : ObservableObject
         return summary?.ToString() ?? string.Empty;
     }
 
+    /// <summary>What a screen reader announces for this row (a ListView reads an item through ToString).</summary>
+    public override string ToString()
+        => $"{(IsOpeningPost ? "Opening post" : "Comment")} by {Author}, {Posted}. {Body}";
+
     public static CommentItem From(IssueComment comment, DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(comment);

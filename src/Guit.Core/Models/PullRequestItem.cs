@@ -53,6 +53,10 @@ public sealed partial class PullRequestItem
 
     public string WebUrl { get; }
 
+    /// <summary>What a screen reader announces for this row (a ListView reads an item through ToString).</summary>
+    public override string ToString()
+        => $"{Title}, {Reference}, by {Author}, {Updated}{(IsDraft ? ", draft" : string.Empty)}";
+
     public static PullRequestItem From(IssueSearchItem item, DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(item);

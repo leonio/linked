@@ -47,6 +47,16 @@ public sealed partial class DiffRow
     /// <summary>For a file heading: "modified · +12 −3". Empty otherwise.</summary>
     public string Detail { get; }
 
+    /// <summary>What a screen reader announces for this row (a ListView reads an item through ToString).</summary>
+    public override string ToString() => Kind switch
+    {
+        DiffRowKind.File => $"File {Text}, {Detail}",
+        DiffRowKind.Added => $"Added, line {NewNumber}: {Text}",
+        DiffRowKind.Removed => $"Removed, line {OldNumber}: {Text}",
+        DiffRowKind.Context => $"Line {NewNumber}: {Text}",
+        _ => Text,
+    };
+
     /// <summary>Appends the rows for one changed file: a heading, then its diff.</summary>
     public static void AppendFile(List<DiffRow> rows, PullFile file)
     {
