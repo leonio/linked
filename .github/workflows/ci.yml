@@ -37,12 +37,16 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # startup_budget_ms: the job fails when the median start-up time is over this.
+          # Measured on these runners in November 2026: x64 about 210 ms, ARM64 about 290 ms.
           - rid: win-x64
             platform: x64
             os: windows-latest
+            startup_budget_ms: 400
           - rid: win-arm64
             platform: ARM64
             os: windows-11-arm
+            startup_budget_ms: 600
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -61,10 +65,12 @@ jobs:
           "Guit.exe: {0:N1} MB; publish folder: {1:N1} MB" -f ($exe.Length / 1MB), ($total / 1MB) | Tee-Object -FilePath $env:GITHUB_STEP_SUMMARY -Append
       - name: Launch and time start-up (the native exe must start and show a window)
         shell: pwsh
+        env:
+          STARTUP_BUDGET_MS: ${{ matrix.startup_budget_ms }}
         run: |
           # Start the app several times and time process start -> main window created.
           # The first run is discarded (cold disk cache); the median of the rest is reported.
-          # STARTUP_BUDGET_MS (set at the top of this file) fails the job when the median exceeds it.
+          # STARTUP_BUDGET_MS (from the job matrix) fails the job when the median exceeds it.
           $dir = Get-ChildItem artifacts/publish/Guit.App -Directory | Select-Object -First 1
           $exe = Join-Path $dir.FullName 'Guit.exe'
           $times = @()
