@@ -206,6 +206,16 @@ public sealed partial class ConversationViewModel(
         }
     }
 
+    /// <summary>Shows the pull request's changed files and their diffs.</summary>
+    [RelayCommand]
+    private void ShowFiles()
+    {
+        if (IsPullRequest && _link.Owner is not null)
+        {
+            navigator.Navigate(Route.PullFiles, (_link with { IsPullRequest = true }).ToArgument());
+        }
+    }
+
     [RelayCommand]
     private void GoBack() => navigator.GoBack();
 

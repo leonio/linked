@@ -86,6 +86,9 @@ await jobLog.LoadCommand.ExecuteAsync("octocat/hello@399444496\tbuild");
 Check(jobLog is { Title: "build", Lines: ["hello"] }, "job log view model");
 PullFile[] changed = await provider.GetRequiredService<IPullsApi>().ListFilesAsync("octocat", "hello", 7, 1, 100, CancellationToken.None);
 Check(changed is [{ Filename: "src/a.cs", Additions: 1, Patch: not null }], "pulls api: list files");
+PullFilesViewModel pullFiles = provider.GetRequiredService<PullFilesViewModel>();
+await pullFiles.LoadCommand.ExecuteAsync("octocat/hello!7");
+Check(pullFiles.Rows is [{ Kind: Guit.Core.Models.DiffRowKind.File, Text: "src/a.cs" }, { Kind: Guit.Core.Models.DiffRowKind.Hunk }, { Text: "line", OldNumber: "1", NewNumber: "1" }, { Kind: Guit.Core.Models.DiffRowKind.Removed, Text: "old" }, { Kind: Guit.Core.Models.DiffRowKind.Added, Text: "new", NewNumber: "2" }], "pull files view model");
 
 InboxViewModel inbox = provider.GetRequiredService<InboxViewModel>();
 await inbox.LoadCommand.ExecuteAsync(null);

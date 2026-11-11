@@ -262,4 +262,20 @@ public sealed class ConversationViewModelTests
         await Assert.That(pulls.Calls).IsEqualTo(0);
         await Assert.That(viewModel.IsPullRequest).IsFalse();
     }
+
+    [Test]
+    public async Task ShowFiles_opens_the_changed_files_of_a_pull_request_only()
+    {
+        FakeNavigator navigator = new();
+        ConversationViewModel pull = Create(new FakeIssuesApi(Sample.Issue()), navigator);
+        await pull.LoadCommand.ExecuteAsync("octocat/hello!7");
+        pull.ShowFilesCommand.Execute(null);
+        await Assert.That(navigator.Navigations[0]).IsEqualTo((Guit.Core.Services.Route.PullFiles, (string?)"octocat/hello!7"));
+
+        FakeNavigator other = new();
+        ConversationViewModel issue = Create(new FakeIssuesApi(Sample.Issue(isPullRequest: false)), other);
+        await issue.LoadCommand.ExecuteAsync("octocat/hello#7");
+        issue.ShowFilesCommand.Execute(null);
+        await Assert.That(other.Navigations.Count).IsEqualTo(0);
+    }
 }

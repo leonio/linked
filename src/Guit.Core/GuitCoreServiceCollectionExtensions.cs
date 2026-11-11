@@ -27,6 +27,7 @@ public static class GuitCoreServiceCollectionExtensions
         services.AddTransient<InboxViewModel>();
         services.AddTransient<JobLogViewModel>();
         services.AddTransient<JobsViewModel>();
+        services.AddTransient<PullFilesViewModel>();
         services.AddTransient<PullRequestsViewModel>();
         services.AddSingleton<RunsViewModel>();
         services.AddSingleton<ShellViewModel>();
