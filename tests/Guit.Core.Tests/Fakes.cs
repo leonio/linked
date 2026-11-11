@@ -285,6 +285,50 @@ internal sealed class FakeNotificationsApi(params NotificationThread[][] pages) 
         return reply;
     }
 
+    /// <summary>The If-Modified-Since value of each poll (null for an unconditional one).</summary>
+    public List<string?> PollDates { get; } = [];
+
+    /// <summary>When set, polls answer 304 while the caller sends this date.</summary>
+    public string? NotModifiedSince { get; set; }
+
+    /// <summary>The Last-Modified value sent with each 200 poll reply.</summary>
+    public DateTimeOffset LastModified { get; set; } = Sample.Now;
+
+    /// <summary>The X-Poll-Interval value sent with each poll reply, in seconds.</summary>
+    public int PollInterval { get; set; } = 60;
+
+    public Task<ApiResponse<NotificationThread[]>> PollAsync(bool all, bool participating, int page, int perPage, string? ifModifiedSince, CancellationToken cancellationToken)
+    {
+        ListCalls.Add((all, participating, page, perPage));
+        PollDates.Add(ifModifiedSince);
+
+        HttpStatusCode status = HttpStatusCode.OK;
+        NotificationThread[]? content = null;
+        if (FailNextWith is { } failure)
+        {
+            FailNextWith = null;
+            status = failure;
+        }
+        else if (NotModifiedSince is not null && ifModifiedSince == NotModifiedSince)
+        {
+            status = HttpStatusCode.NotModified;
+        }
+        else
+        {
+            content = _pages.Count > 0 ? _pages.Dequeue() : [];
+        }
+
+        HttpResponseMessage message = new(status) { RequestMessage = new HttpRequestMessage(HttpMethod.Get, "https://api.github.com/notifications") };
+        message.Headers.TryAddWithoutValidation("X-Poll-Interval", PollInterval.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        if (content is not null)
+        {
+            message.Content = new StringContent("[]");
+            message.Content.Headers.LastModified = LastModified;
+        }
+
+        return Task.FromResult(new ApiResponse<NotificationThread[]>(message, content, GitHubRefit.CreateSettings()));
+    }
+
     public Task MarkAsReadAsync(string threadId, CancellationToken cancellationToken)
     {
         MarkedRead.Add(threadId);

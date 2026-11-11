@@ -73,7 +73,7 @@ one layer, one or two files plus tests, a worked example to copy.
 ## Phase 5 - Speed and shipping ([cards](tasks/phase-5-speed-and-shipping.md))
 
 - [ ] 5.1 **[S]** Start-up time measured in CI, with a budget that fails the build
-- [ ] 5.2 **[S]** Conditional requests (ETag / `Last-Modified`, `X-Poll-Interval`) for polling
+- [x] 5.2 **[S]** Conditional requests (ETag / `Last-Modified`, `X-Poll-Interval`) for polling
 - [ ] 5.3 Settings page: theme, account, about
 - [ ] 5.4 Keyboard and accessibility pass
 - [ ] 5.5 ARM64 build in CI

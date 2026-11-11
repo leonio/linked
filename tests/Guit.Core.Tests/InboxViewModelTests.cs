@@ -422,4 +422,51 @@ public sealed class InboxViewModelTests
         viewModel.Kind = InboxKind.All;
         await Assert.That(viewModel.Items[1].Id).IsEqualTo("2");
     }
+
+    [Test]
+    public async Task Polls_after_the_first_are_conditional_and_a_304_changes_nothing()
+    {
+        FakeNotificationsApi api = new(Sample.Threads(2), Sample.Threads(2)) { LastModified = new DateTimeOffset(2026, 1, 1, 10, 0, 0, TimeSpan.Zero) };
+        api.NotModifiedSince = "Thu, 01 Jan 2026 10:00:00 GMT";
+        InboxViewModel viewModel = Create(api);
+        await viewModel.LoadCommand.ExecuteAsync(null);
+        NotificationItem first = viewModel.Items[0];
+
+        await viewModel.RefreshCommand.ExecuteAsync(null);
+        await viewModel.RefreshCommand.ExecuteAsync(null);
+
+        await Assert.That(api.PollDates[0]).IsNull();
+        await Assert.That(api.PollDates[1]).IsEqualTo("Thu, 01 Jan 2026 10:00:00 GMT");
+        await Assert.That(ReferenceEquals(viewModel.Items[0], first)).IsTrue();
+        await Assert.That(viewModel.ErrorMessage).IsNull();
+    }
+
+    [Test]
+    public async Task A_full_load_makes_the_next_poll_unconditional_again()
+    {
+        FakeNotificationsApi api = new(Sample.Threads(1), Sample.Threads(1), Sample.Threads(1), Sample.Threads(1));
+        InboxViewModel viewModel = Create(api);
+        await viewModel.LoadCommand.ExecuteAsync(null);
+        await viewModel.RefreshCommand.ExecuteAsync(null);
+
+        viewModel.Filter = InboxFilter.All;
+        await viewModel.RefreshCommand.ExecuteAsync(null);
+
+        await Assert.That(api.PollDates[^1]).IsNull();
+    }
+
+    [Test]
+    public async Task The_poll_period_follows_GitHub_but_never_drops_below_a_minute()
+    {
+        FakeNotificationsApi api = new(Sample.Threads(1), Sample.Threads(1), Sample.Threads(1)) { PollInterval = 120 };
+        InboxViewModel viewModel = Create(api);
+        await viewModel.LoadCommand.ExecuteAsync(null);
+
+        await viewModel.RefreshCommand.ExecuteAsync(null);
+        await Assert.That(viewModel.PollPeriod).IsEqualTo(TimeSpan.FromSeconds(120));
+
+        api.PollInterval = 5;
+        await viewModel.RefreshCommand.ExecuteAsync(null);
+        await Assert.That(viewModel.PollPeriod).IsEqualTo(TimeSpan.FromSeconds(60));
+    }
 }

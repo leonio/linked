@@ -94,6 +94,12 @@ InboxViewModel inbox = provider.GetRequiredService<InboxViewModel>();
 await inbox.LoadCommand.ExecuteAsync(null);
 Check(inbox.Items is [{ Title: "Fix it", Repository: "octocat/hello", IsUnread: true }], "inbox view model");
 
+await inbox.RefreshCommand.ExecuteAsync(null);
+using (Refit.ApiResponse<NotificationThread[]> poll = await notifications.PollAsync(false, false, 1, 50, "Thu, 01 Jan 2026 10:00:00 GMT", CancellationToken.None))
+{
+    Check(poll.StatusCode == HttpStatusCode.NotModified && inbox.Items.Count == 1, "conditional poll: 304");
+}
+
 ShellViewModel shell = provider.GetRequiredService<ShellViewModel>();
 await shell.LoadUserCommand.ExecuteAsync(null);
 Check(shell is { IsSignedIn: true, Login: "octocat" }, "shell view model");
@@ -205,6 +211,11 @@ internal sealed class CannedHandler : HttpMessageHandler
                 RequestMessage = request,
                 Content = new StringContent("2026-01-02T00:00:10.0000000Z hello\n", Encoding.UTF8, "text/plain"),
             });
+        }
+
+        if (authorized && request.RequestUri?.AbsolutePath == "/notifications" && request.Headers.Contains("If-Modified-Since"))
+        {
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotModified) { RequestMessage = request });
         }
 
         HttpResponseMessage response = json is null

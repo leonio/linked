@@ -32,15 +32,39 @@ internal sealed class RecordingHandler(string replyJson) : HttpMessageHandler
 
     public string? Accept { get; private set; }
 
+    public string? IfModifiedSince { get; private set; }
+
+    /// <summary>Status of the reply. Anything but 200 is sent without a body.</summary>
+    public HttpStatusCode Status { get; init; } = HttpStatusCode.OK;
+
+    /// <summary>Extra reply headers, as "Name: value".</summary>
+    public string[] ReplyHeaders { get; init; } = [];
+
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
         Method = request.Method;
         Path = request.RequestUri?.PathAndQuery;
         Accept = request.Headers.Accept.ToString();
         Body = request.Content is null ? null : await request.Content.ReadAsStringAsync(cancellationToken);
-        return new HttpResponseMessage(HttpStatusCode.OK)
+        IfModifiedSince = request.Headers.TryGetValues("If-Modified-Since", out IEnumerable<string>? values) ? string.Join(",", values) : null;
+
+        HttpResponseMessage response = new(Status) { RequestMessage = request };
+        if (Status == HttpStatusCode.OK)
         {
-            Content = new StringContent(replyJson, Encoding.UTF8, "application/json"),
-        };
+            response.Content = new StringContent(replyJson, Encoding.UTF8, "application/json");
+        }
+
+        foreach (string header in ReplyHeaders)
+        {
+            int colon = header.IndexOf(':', StringComparison.Ordinal);
+            string name = header[..colon];
+            string value = header[(colon + 1)..].Trim();
+            if (!response.Headers.TryAddWithoutValidation(name, value))
+            {
+                response.Content?.Headers.TryAddWithoutValidation(name, value);
+            }
+        }
+
+        return response;
     }
 }

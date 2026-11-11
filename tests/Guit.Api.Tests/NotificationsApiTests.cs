@@ -1,4 +1,6 @@
+using System.Net;
 using Guit.Api.Notifications;
+using Refit;
 using Refit.Testing;
 
 namespace Guit.Api.Tests;
@@ -39,7 +41,7 @@ public sealed class NotificationsApiTests
     {
         using StubHttp http = new()
         {
-            { Route.Patch("/notifications/threads/{id}"), Reply.Status(System.Net.HttpStatusCode.ResetContent) },
+            { Route.Patch("/notifications/threads/{id}"), Reply.Status(HttpStatusCode.ResetContent) },
         };
 
         await Stub.Client<INotificationsApi>(http).MarkAsReadAsync("42", CancellationToken.None);
@@ -53,11 +55,40 @@ public sealed class NotificationsApiTests
     {
         using StubHttp http = new()
         {
-            { Route.Delete("/notifications/threads/{id}"), Reply.Status(System.Net.HttpStatusCode.NoContent) },
+            { Route.Delete("/notifications/threads/{id}"), Reply.Status(HttpStatusCode.NoContent) },
         };
 
         await Stub.Client<INotificationsApi>(http).MarkAsDoneAsync("42", CancellationToken.None);
 
         http.VerifyAllCalled();
+    }
+
+    [Test]
+    public async Task Poll_without_a_date_is_unconditional_and_exposes_the_polling_headers()
+    {
+        using RecordingHandler http = new(OneThread) { ReplyHeaders = ["X-Poll-Interval: 90", "Last-Modified: Thu, 01 Jan 2026 10:00:00 GMT"] };
+        INotificationsApi api = Stub.Client<INotificationsApi>(http);
+
+        using ApiResponse<NotificationThread[]> reply = await api.PollAsync(all: false, participating: false, page: 1, perPage: 50, ifModifiedSince: null, CancellationToken.None);
+
+        await Assert.That(http.Path).IsEqualTo("/notifications?all=false&participating=false&page=1&per_page=50");
+        await Assert.That(http.IfModifiedSince).IsNull();
+        await Assert.That(reply.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(reply.Content!.Length).IsEqualTo(1);
+        await Assert.That(string.Join(",", reply.Headers!.GetValues("X-Poll-Interval"))).IsEqualTo("90");
+        await Assert.That(reply.ContentHeaders!.LastModified).IsEqualTo(new DateTimeOffset(2026, 1, 1, 10, 0, 0, TimeSpan.Zero));
+    }
+
+    [Test]
+    public async Task Poll_with_a_date_sends_it_and_reports_304_without_throwing()
+    {
+        using RecordingHandler http = new("[]") { Status = HttpStatusCode.NotModified, ReplyHeaders = ["X-Poll-Interval: 60"] };
+        INotificationsApi api = Stub.Client<INotificationsApi>(http);
+
+        using ApiResponse<NotificationThread[]> reply = await api.PollAsync(false, false, 1, 50, "Thu, 01 Jan 2026 10:00:00 GMT", CancellationToken.None);
+
+        await Assert.That(http.IfModifiedSince).IsEqualTo("Thu, 01 Jan 2026 10:00:00 GMT");
+        await Assert.That(reply.StatusCode).IsEqualTo(HttpStatusCode.NotModified);
+        await Assert.That(reply.Content).IsNull();
     }
 }

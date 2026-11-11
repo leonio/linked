@@ -1,4 +1,6 @@
 using System.Collections.ObjectModel;
+using System.Globalization;
+using System.Net;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Guit.Api.Notifications;
@@ -18,7 +20,7 @@ public sealed partial class InboxViewModel(
 {
     private const int PageSize = 50;
 
-    private static readonly TimeSpan PollPeriod = TimeSpan.FromSeconds(60);
+    private static readonly TimeSpan MinimumPollPeriod = TimeSpan.FromSeconds(60);
 
     // Rows the list is meant to hold before the member has to scroll; a kind filter tops up to this.
     private const int ComfortableRowCount = 15;
@@ -30,6 +32,10 @@ public sealed partial class InboxViewModel(
     private int _page = 1;
     private int _generation;
     private ITimer? _pollTimer;
+    private TimeSpan _pollPeriod = MinimumPollPeriod;
+
+    // Last-Modified of the newest poll reply for the current filter; sent back as If-Modified-Since.
+    private string? _lastModified;
 
     public ObservableCollection<NotificationItem> Items { get; } = [];
 
@@ -70,6 +76,7 @@ public sealed partial class InboxViewModel(
     private async Task LoadAsync(CancellationToken cancellationToken)
     {
         int generation = ++_generation;
+        _lastModified = null;
         IsLoading = true;
         ErrorMessage = null;
         try
@@ -145,8 +152,28 @@ public sealed partial class InboxViewModel(
         int generation = _generation;
         try
         {
-            NotificationThread[] page = await ListPageAsync(1, cancellationToken);
-            if (generation != _generation || IsSameAsFirstPage(page))
+            // A conditional request: when nothing changed GitHub answers 304, which is free against the rate limit.
+            using ApiResponse<NotificationThread[]> reply = await notifications.PollAsync(
+                all: Filter == InboxFilter.All,
+                participating: Filter == InboxFilter.Participating,
+                1,
+                PageSize,
+                _lastModified,
+                cancellationToken);
+            if (generation != _generation)
+            {
+                return;
+            }
+
+            FollowPollInterval(reply);
+            if (reply.StatusCode != HttpStatusCode.OK || reply.Content is not { } page)
+            {
+                // 304 Not Modified, or a failure: a background refresh that fails says nothing.
+                return;
+            }
+
+            _lastModified = reply.ContentHeaders?.LastModified?.ToString("R", CultureInfo.InvariantCulture) ?? _lastModified;
+            if (IsSameAsFirstPage(page))
             {
                 return;
             }
@@ -173,8 +200,8 @@ public sealed partial class InboxViewModel(
         => _pollTimer ??= time.CreateTimer(
             static state => ((InboxViewModel)state!).OnPollTick(),
             this,
-            PollPeriod,
-            PollPeriod);
+            _pollPeriod,
+            _pollPeriod);
 
     /// <summary>Stops the background refresh. Call when the page is left.</summary>
     public void StopPolling()
@@ -182,6 +209,25 @@ public sealed partial class InboxViewModel(
         _pollTimer?.Dispose();
         _pollTimer = null;
     }
+
+    /// <summary>GitHub says how often it wants to be polled (X-Poll-Interval, in seconds). Never poll faster than that.</summary>
+    private void FollowPollInterval(ApiResponse<NotificationThread[]> reply)
+    {
+        if (reply.Headers is { } headers
+            && headers.TryGetValues("X-Poll-Interval", out IEnumerable<string>? values)
+            && int.TryParse(values.FirstOrDefault(), NumberStyles.None, CultureInfo.InvariantCulture, out int seconds))
+        {
+            TimeSpan wanted = TimeSpan.FromSeconds(Math.Max(seconds, MinimumPollPeriod.TotalSeconds));
+            if (wanted != _pollPeriod)
+            {
+                _pollPeriod = wanted;
+                _pollTimer?.Change(wanted, wanted);
+            }
+        }
+    }
+
+    /// <summary>The current time between background refreshes.</summary>
+    internal TimeSpan PollPeriod => _pollPeriod;
 
     // Timer callbacks arrive on a thread-pool thread; view model state belongs to the UI thread.
     private void OnPollTick() => dispatcher.Post(() => RefreshCommand.Execute(null));
