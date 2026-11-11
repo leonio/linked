@@ -6,3 +6,21 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 publish.workspace = true
+
+[dependencies]
+guit-core = { path = "../guit-core" }
+windows-reactor = { workspace = true }
+windows-core = { workspace = true }
+# Only the WinRT namespaces the platform layer calls: HTTP, the credential locker, the launcher and the clipboard.
+windows = { workspace = true, features = [
+    "ApplicationModel_DataTransfer",
+    "Foundation_Collections",
+    "Security_Credentials",
+    "Storage_Streams",
+    "System",
+    "Web_Http_Headers",
+    "Win32_System_Com",
+] }
+
+[build-dependencies]
+windows-reactor-setup = { workspace = true }
