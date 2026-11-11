@@ -164,6 +164,13 @@ impl<'a, T: Transport + ?Sized> GitHub<'a, T> {
         self.send(&request).map(|_| ())
     }
 
+    /// operationId: activity/mark-thread-as-done
+    pub fn mark_thread_done(&self, token: &str, thread_id: &str) -> Result<(), ApiError> {
+        let mut request = Self::authorized(Request::get(format!("{API}/notifications/threads/{}", encode(thread_id))), token);
+        request.method = "DELETE";
+        self.send(&request).map(|_| ())
+    }
+
     fn authorized(request: Request, token: &str) -> Request {
         request
             .header("Authorization", format!("Bearer {token}"))
@@ -302,6 +309,16 @@ mod tests {
 
         let sent = &transport.sent.borrow()[0];
         assert_eq!((sent.method, sent.url.as_str()), ("PATCH", "https://api.github.com/notifications/threads/42"));
+    }
+
+    #[test]
+    fn mark_thread_done_deletes_the_thread() {
+        let transport = Canned::new().reply(204, "");
+
+        GitHub::new(&transport).mark_thread_done("tok", "42").unwrap();
+
+        let sent = &transport.sent.borrow()[0];
+        assert_eq!((sent.method, sent.url.as_str()), ("DELETE", "https://api.github.com/notifications/threads/42"));
     }
 
     #[test]
