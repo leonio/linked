@@ -3,6 +3,7 @@ using Guit.Api.Auth;
 using Guit.Api.Http;
 using Guit.Api.Issues;
 using Guit.Api.Notifications;
+using Guit.Api.Repos;
 using Guit.Api.Pulls;
 using Guit.Api.Reactions;
 using Guit.Api.Search;

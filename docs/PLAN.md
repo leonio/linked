@@ -26,7 +26,7 @@ one layer, one or two files plus tests, a worked example to copy.
 - [x] 1.1 Device flow API (`IGitHubDeviceFlowApi`, `DeviceFlow.WaitForTokenAsync`)
 - [x] 1.2 `Session`, `SignInViewModel`, `ShellViewModel`
 - [x] 1.3 Sign-in view, Credential Locker token store, launcher
-- [ ] 1.4 **[H]** Register the GitHub OAuth App, set the client id, sign in for real on Windows
+- [x] 1.4 **[H]** Register the GitHub OAuth App, set the client id, sign in for real on Windows
 - [x] 1.5 **[S]** Sign out automatically on HTTP 401 (adds `IUiDispatcher`)
 - [x] 1.6 Friendly error messages (`ApiErrors.Describe`)
 
@@ -57,8 +57,8 @@ one layer, one or two files plus tests, a worked example to copy.
 
 ## Phase 4 - Actions, the jobs ([cards](tasks/phase-4-actions.md))
 
-- [ ] 4.1 Repositories API: list my repositories
-- [ ] 4.2 Actions API: list workflow runs, list jobs for a run
+- [x] 4.1 Repositories API: list my repositories
+- [x] 4.2 Actions API: list workflow runs, list jobs for a run
 - [ ] 4.3 `RunsViewModel` and `RunsPage`
 - [ ] 4.4 `JobsViewModel` and run detail page
 - [ ] 4.5 Re-run a workflow

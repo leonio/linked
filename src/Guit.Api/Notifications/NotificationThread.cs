@@ -1,4 +1,4 @@
-using Guit.Api.Users;
+using Guit.Api.Repos;
 
 namespace Guit.Api.Notifications;
 
@@ -22,12 +22,3 @@ public sealed record NotificationSubject(
     string Type,
     string? Url = null,
     string? LatestCommentUrl = null);
-
-/// <summary>Schema: minimal-repository. Only the fields the app shows.</summary>
-public sealed record RepositorySummary(
-    long Id,
-    string Name,
-    string FullName,
-    bool Private,
-    string HtmlUrl,
-    GitHubUser Owner);

@@ -1,10 +1,12 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Guit.Api.Actions;
 using Guit.Api.Auth;
 using Guit.Api.Issues;
 using Guit.Api.Notifications;
 using Guit.Api.Pulls;
 using Guit.Api.Reactions;
+using Guit.Api.Repos;
 using Guit.Api.Search;
 using Guit.Api.Users;
 
@@ -20,6 +22,9 @@ namespace Guit.Api;
     JsonSerializerDefaults.Web,
     PropertyNamingPolicy = JsonKnownNamingPolicy.SnakeCaseLower,
     DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
+// Actions
+[JsonSerializable(typeof(JobList))]
+[JsonSerializable(typeof(WorkflowRunList))]
 // Auth
 [JsonSerializable(typeof(DeviceCode))]
 [JsonSerializable(typeof(DeviceTokenResponse))]
@@ -34,6 +39,8 @@ namespace Guit.Api;
 [JsonSerializable(typeof(PullRequest))]
 // Reactions
 [JsonSerializable(typeof(CreateReactionRequest))]
+// Repos
+[JsonSerializable(typeof(RepositorySummary[]))]
 // Search
 [JsonSerializable(typeof(IssueSearchResult))]
 // Users
