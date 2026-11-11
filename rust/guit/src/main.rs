@@ -5,12 +5,15 @@
 //! Windows platform layer.
 #![windows_subsystem = "windows"]
 
+mod actions;
 mod platform;
 mod pulls;
 
 use std::rc::Rc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+use actions::{Actions, JobLog, RunDetail};
+use guit_core::actions::{JobRow, RunItem, log_lines};
 use guit_core::api::{ApiError, DeviceCode, GitHub, User};
 use guit_core::conversation::{CommentItem, PullRequestItem, PullRequestScope};
 use guit_core::device_flow::{DeviceFlowOutcome, wait_for_token};
@@ -58,6 +61,37 @@ pub(crate) enum Message {
         error: Option<String>,
     },
 
+    // The Actions pages.
+    RepositoriesLoaded(Result<Vec<String>, ApiError>),
+    RepositorySelected(Option<usize>),
+    ReloadRuns,
+    RunsLoaded {
+        generation: u64,
+        result: Result<Vec<RunItem>, ApiError>,
+    },
+    OpenRun(Option<usize>),
+    ReloadRun,
+    FollowRun,
+    RunLoaded {
+        run_id: u64,
+        /// A quiet load is the background follow: it shows no spinner and does not report failures.
+        quiet: bool,
+        result: Result<(RunItem, Vec<JobRow>), ApiError>,
+    },
+    Rerun,
+    RerunFinished {
+        run_id: u64,
+        error: Option<String>,
+    },
+    CloseRun,
+    OpenRunInBrowser,
+    OpenJob(Option<usize>),
+    JobLogLoaded {
+        job_id: u64,
+        result: Result<(Vec<String>, bool), ApiError>,
+    },
+    CloseLog,
+
     // The shell.
     Navigate(Option<String>),
 
@@ -98,6 +132,7 @@ pub(crate) struct LoadedConversation {
 enum Section {
     Inbox,
     PullRequests,
+    Actions,
 }
 
 /// The sign-in view's state.
@@ -126,6 +161,7 @@ struct Shell {
     pulls: Pulls,
     /// The issue or pull request being read, shown in place of the section's page.
     conversation: Option<Conversation>,
+    actions: Actions,
 }
 
 enum Session {
@@ -163,6 +199,7 @@ impl Guit {
             section: Section::Inbox,
             pulls: Pulls::default(),
             conversation: None,
+            actions: Actions::default(),
         });
     }
 
@@ -263,6 +300,64 @@ impl Shell {
                         .collect()
                 });
             Message::PullsLoaded { generation, result }
+        });
+    }
+}
+
+/// How often an open run refreshes itself while it is queued or in progress.
+const FOLLOW_PERIOD: Duration = Duration::from_secs(5);
+
+/// After a re-run, keep checking for two minutes even though GitHub still reports the old attempt.
+const TICKS_AFTER_RERUN: u32 = 24;
+
+impl Shell {
+    fn load_runs(&mut self, context: &ComponentContext<Guit>) {
+        let Some((owner, repo)) = self.actions.repository() else {
+            return;
+        };
+        self.actions.generation += 1;
+        self.actions.loading = true;
+        self.actions.error = None;
+        let (generation, token) = (self.actions.generation, self.token.clone());
+        _ = context.spawn_background(move |_| {
+            let result = GitHub::new(&WinRtTransport)
+                .workflow_runs(&token, &owner, &repo, 1, 30)
+                .map(|runs| {
+                    let now = now();
+                    runs.iter().map(|run| RunItem::from_run(run, now)).collect()
+                });
+            Message::RunsLoaded { generation, result }
+        });
+    }
+
+    /// Fetches the open run and its jobs. `quiet` is the background follow.
+    fn load_run(&mut self, quiet: bool, context: &ComponentContext<Guit>) {
+        let Some(run) = &mut self.actions.run else {
+            return;
+        };
+        if !quiet {
+            run.loading = true;
+            run.error = None;
+        }
+        let (token, owner, repo, run_id) = (
+            self.token.clone(),
+            run.owner.clone(),
+            run.repo.clone(),
+            run.run_id,
+        );
+        _ = context.spawn_background(move |_| {
+            let github = GitHub::new(&WinRtTransport);
+            let result = github
+                .workflow_run(&token, &owner, &repo, run_id)
+                .and_then(|run| {
+                    let jobs = github.jobs(&token, &owner, &repo, run_id)?;
+                    Ok((RunItem::from_run(&run, now()), JobRow::rows(&jobs)))
+                });
+            Message::RunLoaded {
+                run_id,
+                quiet,
+                result,
+            }
         });
     }
 }
@@ -473,13 +568,24 @@ impl Component for Guit {
             // ---- the shell, pull requests and conversations -----------------------------------
             (Session::SignedIn(shell), Message::Navigate(tag)) => {
                 shell.conversation = None;
-                shell.section = if tag.as_deref() == Some("pulls") {
-                    Section::PullRequests
-                } else {
-                    Section::Inbox
+                shell.actions.run = None;
+                shell.section = match tag.as_deref() {
+                    Some("pulls") => Section::PullRequests,
+                    Some("actions") => Section::Actions,
+                    _ => Section::Inbox,
                 };
                 if shell.section == Section::PullRequests && !shell.pulls.loaded {
                     shell.load_pulls(context);
+                }
+                if shell.section == Section::Actions && !shell.actions.loaded {
+                    shell.actions.loaded = true;
+                    shell.actions.loading = true;
+                    let token = shell.token.clone();
+                    _ = context.spawn_background(move |_| {
+                        Message::RepositoriesLoaded(
+                            GitHub::new(&WinRtTransport).my_repositories(&token, 50),
+                        )
+                    });
                 }
             }
             (Session::SignedIn(shell), Message::ScopeSelected(scope))
@@ -578,6 +684,214 @@ impl Component for Guit {
                 }
             }
 
+            // ---- Actions ------------------------------------------------------------------------
+            (Session::SignedIn(shell), Message::RepositoriesLoaded(result)) => match result {
+                Ok(repositories) => {
+                    shell.actions.repositories = repositories;
+                    shell.actions.selected = (!shell.actions.repositories.is_empty()).then_some(0);
+                    shell.actions.loading = false;
+                    shell.load_runs(context);
+                }
+                Err(error) if error.is_unauthorized() => self.sign_out(),
+                Err(error) => {
+                    shell.actions.loading = false;
+                    shell.actions.loaded = false;
+                    shell.actions.error = Some(error.describe());
+                }
+            },
+            (Session::SignedIn(shell), Message::RepositorySelected(Some(index)))
+                if shell.actions.selected != Some(index) =>
+            {
+                shell.actions.selected = Some(index);
+                shell.actions.runs.clear();
+                shell.load_runs(context);
+            }
+            (Session::SignedIn(shell), Message::ReloadRuns) => shell.load_runs(context),
+            (Session::SignedIn(shell), Message::RunsLoaded { generation, result })
+                if generation == shell.actions.generation =>
+            {
+                shell.actions.loading = false;
+                match result {
+                    Ok(runs) => shell.actions.runs = runs,
+                    Err(error) if error.is_unauthorized() => self.sign_out(),
+                    Err(error) => shell.actions.error = Some(error.describe()),
+                }
+            }
+            (Session::SignedIn(shell), Message::OpenRun(Some(index))) => {
+                if let (Some(run), Some((owner, repo))) =
+                    (shell.actions.runs.get(index), shell.actions.repository())
+                {
+                    shell.actions.run = Some(RunDetail::opening(owner, repo, run));
+                    shell.load_run(false, context);
+                }
+            }
+            (Session::SignedIn(shell), Message::ReloadRun) => shell.load_run(false, context),
+            (Session::SignedIn(shell), Message::FollowRun) => {
+                if let Some(run) = &mut shell.actions.run {
+                    run.timer = None;
+                    if run.should_follow() {
+                        run.forced_ticks = run.forced_ticks.saturating_sub(1);
+                        if run.forced_ticks == 0
+                            && !run.status.is_some_and(|status| status.is_live())
+                        {
+                            run.notice = None;
+                        }
+                        shell.load_run(true, context);
+                    }
+                }
+            }
+            (
+                Session::SignedIn(shell),
+                Message::RunLoaded {
+                    run_id,
+                    quiet,
+                    result,
+                },
+            ) => {
+                if let Some(run) = shell
+                    .actions
+                    .run
+                    .as_mut()
+                    .filter(|open| open.run_id == run_id)
+                {
+                    if !quiet {
+                        run.loading = false;
+                    }
+                    match result {
+                        Ok((summary, rows)) => {
+                            run.title = summary.title;
+                            run.detail = summary.detail;
+                            run.status = Some(summary.status);
+                            if summary.status.is_live() {
+                                run.notice = None;
+                            }
+                            // Replace the rows only when something a row shows has changed, so a quiet follow does not flicker.
+                            if run.rows != rows {
+                                run.rows = rows;
+                            }
+                        }
+                        Err(error) if error.is_unauthorized() => {
+                            self.sign_out();
+                            return;
+                        }
+                        Err(error) if !quiet => run.error = Some(error.describe()),
+                        Err(_) => {}
+                    }
+                    // Keep following while the run is live, or for a while after a re-run was requested.
+                    if run.should_follow() {
+                        run.timer = Some(context.set_timeout(FOLLOW_PERIOD, Message::FollowRun));
+                    }
+                }
+            }
+            (Session::SignedIn(shell), Message::Rerun) => {
+                if let Some(run) = shell.actions.run.as_mut().filter(|open| !open.rerunning) {
+                    run.rerunning = true;
+                    run.error = None;
+                    let (token, owner, repo, run_id) = (
+                        shell.token.clone(),
+                        run.owner.clone(),
+                        run.repo.clone(),
+                        run.run_id,
+                    );
+                    _ = context.spawn_background(move |_| Message::RerunFinished {
+                        run_id,
+                        error: GitHub::new(&WinRtTransport)
+                            .rerun(&token, &owner, &repo, run_id)
+                            .err()
+                            .map(|error| error.describe()),
+                    });
+                }
+            }
+            (Session::SignedIn(shell), Message::RerunFinished { run_id, error }) => {
+                if let Some(run) = shell
+                    .actions
+                    .run
+                    .as_mut()
+                    .filter(|open| open.run_id == run_id)
+                {
+                    run.rerunning = false;
+                    match error {
+                        Some(error) => run.error = Some(error),
+                        None => {
+                            // GitHub accepts the request before the run changes state, so say so and keep checking.
+                            run.notice = Some(
+                                "Re-run requested. Waiting for GitHub to start it\u{2026}"
+                                    .to_string(),
+                            );
+                            run.forced_ticks = TICKS_AFTER_RERUN;
+                            shell.load_run(false, context);
+                        }
+                    }
+                }
+            }
+            (Session::SignedIn(shell), Message::CloseRun) => shell.actions.run = None,
+            (Session::SignedIn(shell), Message::OpenRunInBrowser) => {
+                if let Some(run) = &shell.actions.run {
+                    platform::open_in_browser(&format!(
+                        "https://github.com/{}/{}/actions/runs/{}",
+                        run.owner, run.repo, run.run_id
+                    ));
+                }
+            }
+            (Session::SignedIn(shell), Message::OpenJob(Some(index))) => {
+                if let Some(run) = &mut shell.actions.run
+                    && let Some(row) = run.rows.get(index)
+                {
+                    let (token, owner, repo, job_id) = (
+                        shell.token.clone(),
+                        run.owner.clone(),
+                        run.repo.clone(),
+                        row.job_id,
+                    );
+                    run.log = Some(JobLog {
+                        job_id,
+                        name: row.job_name.clone(),
+                        lines: Rc::new(Vec::new()),
+                        loading: true,
+                        error: None,
+                        notice: None,
+                    });
+                    _ = context.spawn_background(move |_| Message::JobLogLoaded {
+                        job_id,
+                        result: GitHub::new(&WinRtTransport)
+                            .job_log(&token, &owner, &repo, job_id)
+                            .map(|raw| log_lines(&raw, actions::MAX_LOG_LINES)),
+                    });
+                }
+            }
+            (Session::SignedIn(shell), Message::JobLogLoaded { job_id, result }) => {
+                if let Some(log) = shell
+                    .actions
+                    .run
+                    .as_mut()
+                    .and_then(|run| run.log.as_mut())
+                    .filter(|log| log.job_id == job_id)
+                {
+                    log.loading = false;
+                    match result {
+                        Ok((lines, truncated)) => {
+                            log.lines = Rc::new(lines);
+                            log.notice = truncated.then(|| {
+                                format!("Showing the last {} lines. Open the run on GitHub for the full log.", actions::MAX_LOG_LINES)
+                            });
+                        }
+                        // GitHub only publishes a job's log once the job has finished.
+                        Err(ApiError::Status { status: 404, .. }) => {
+                            log.error = Some(
+                                "No log yet. GitHub publishes a job's log when the job finishes."
+                                    .to_string(),
+                            );
+                        }
+                        Err(error) => log.error = Some(error.describe()),
+                    }
+                }
+            }
+            (Session::SignedIn(shell), Message::CloseLog) => {
+                if let Some(run) = &mut shell.actions.run {
+                    run.log = None;
+                }
+            }
+
             // A message for a state the app has already left (a late reply after signing out, say).
             _ => {}
         }
@@ -663,6 +977,7 @@ fn shell_view(shell: &Shell, context: &ViewContext<Guit>) -> View {
         (Some(conversation), _) => pulls::conversation_page(conversation, context),
         (None, Section::Inbox) => inbox_page(shell, context),
         (None, Section::PullRequests) => pulls::pulls_page(&shell.pulls, context),
+        (None, Section::Actions) => actions::page(&shell.actions, context),
     };
 
     NavigationView::new()
@@ -680,6 +995,11 @@ fn shell_view(shell: &Shell, context: &ViewContext<Guit>) -> View {
                 .content("Pull requests")
                 .icon(Symbol::Switch)
                 .is_selected(shell.section == Section::PullRequests),
+            NavigationViewItem::new()
+                .tag("actions")
+                .content("Actions")
+                .icon(Symbol::Play)
+                .is_selected(shell.section == Section::Actions),
         ))
         .on_selected_tag_changed(
             context
