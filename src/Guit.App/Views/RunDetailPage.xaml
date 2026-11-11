@@ -72,7 +72,7 @@
       </StackPanel>
     </Grid>
 
-    <!-- Clicking a job opens its log on github.com. -->
+    <!-- One flat list: job rows with their step rows indented beneath. Clicking either opens the job's log. -->
     <ListView
         Grid.Row="1"
         Padding="12,0,12,12"
@@ -80,9 +80,17 @@
         ItemClick="OnItemClick"
         ItemsSource="{x:Bind ViewModel.Jobs}"
         SelectionMode="None">
+      <ListView.ItemContainerStyle>
+        <Style BasedOn="{StaticResource DefaultListViewItemStyle}" TargetType="ListViewItem">
+          <Setter Property="MinHeight" Value="0" />
+        </Style>
+      </ListView.ItemContainerStyle>
       <ListView.ItemTemplate>
         <DataTemplate x:DataType="models:JobItem">
-          <Grid Height="44" ColumnSpacing="12">
+          <Grid
+              Height="{x:Bind xaml:Bind.StepRowHeight(IsStep)}"
+              Margin="{x:Bind xaml:Bind.StepIndent(IsStep)}"
+              ColumnSpacing="12">
             <Grid.ColumnDefinitions>
               <ColumnDefinition Width="Auto" />
               <ColumnDefinition Width="*" />
@@ -91,12 +99,13 @@
             <FontIcon
                 VerticalAlignment="Center"
                 AutomationProperties.Name="{x:Bind StatusKind}"
-                FontSize="16"
+                FontSize="14"
                 Glyph="{x:Bind StatusGlyph}"
                 ToolTipService.ToolTip="{x:Bind StatusKind}" />
             <TextBlock
                 Grid.Column="1"
                 VerticalAlignment="Center"
+                FontWeight="{x:Bind xaml:Bind.StepWeight(IsStep)}"
                 Text="{x:Bind Name}"
                 TextTrimming="CharacterEllipsis" />
             <TextBlock
@@ -109,6 +118,21 @@
         </DataTemplate>
       </ListView.ItemTemplate>
     </ListView>
+
+    <ProgressBar
+        Grid.Row="1"
+        VerticalAlignment="Top"
+        IsIndeterminate="True"
+        Visibility="{x:Bind ViewModel.IsLive, Mode=OneWay}" />
+
+    <InfoBar
+        Grid.Row="1"
+        Margin="24,8,24,0"
+        VerticalAlignment="Bottom"
+        IsClosable="False"
+        IsOpen="{x:Bind xaml:Bind.IsNotEmpty(ViewModel.Notice), Mode=OneWay}"
+        Message="{x:Bind ViewModel.Notice, Mode=OneWay}"
+        Severity="Informational" />
 
     <ProgressRing Grid.Row="1" IsActive="{x:Bind ViewModel.IsLoading, Mode=OneWay}" />
 

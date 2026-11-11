@@ -1,6 +1,8 @@
+using Microsoft.UI.Text;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
+using Windows.UI.Text;
 
 namespace Guit.App.Xaml;
 
@@ -22,6 +24,13 @@ public static class Bind
 
     /// <summary>Read rows are dimmed; unread rows are fully opaque.</summary>
     public static double UnreadOpacity(bool isUnread) => isUnread ? 1.0 : 0.55;
+
+    /// <summary>Run detail rows: a step sits indented under its job.</summary>
+    public static Thickness StepIndent(bool isStep) => new(isStep ? 28 : 0, 0, 0, 0);
+
+    public static double StepRowHeight(bool isStep) => isStep ? 32 : 44;
+
+    public static FontWeight StepWeight(bool isStep) => isStep ? FontWeights.Normal : FontWeights.SemiBold;
 
     /// <summary>
     /// Creates an image decoded at the size it is shown, so a 460px avatar does not sit in memory as 460px.

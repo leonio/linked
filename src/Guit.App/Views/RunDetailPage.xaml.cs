@@ -13,6 +13,10 @@ public sealed partial class RunDetailPage : Page
     {
         ViewModel = App.Services.GetRequiredService<JobsViewModel>();
         InitializeComponent();
+
+        // Follow the run only while the page is on screen.
+        Loaded += (_, _) => ViewModel.StartFollowing();
+        Unloaded += (_, _) => ViewModel.StopFollowing();
     }
 
     public JobsViewModel ViewModel { get; }
