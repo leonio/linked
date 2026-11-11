@@ -49,18 +49,41 @@ jobs:
           $exe = Get-Item (Join-Path $dir.FullName 'Guit.exe')
           $total = (Get-ChildItem $dir.FullName -Recurse -File | Measure-Object Length -Sum).Sum
           "Guit.exe: {0:N1} MB; publish folder: {1:N1} MB" -f ($exe.Length / 1MB), ($total / 1MB) | Tee-Object -FilePath $env:GITHUB_STEP_SUMMARY -Append
-      - name: Launch smoke test (the native exe must start and show a window)
+      - name: Launch and time start-up (the native exe must start and show a window)
         shell: pwsh
         run: |
+          # Start the app several times and time process start -> main window created.
+          # The first run is discarded (cold disk cache); the median of the rest is reported.
+          # STARTUP_BUDGET_MS (set at the top of this file) fails the job when the median exceeds it.
           $dir = Get-ChildItem artifacts/publish/Guit.App -Directory | Select-Object -First 1
-          $app = Start-Process -FilePath (Join-Path $dir.FullName 'Guit.exe') -PassThru
-          Start-Sleep -Seconds 12
-          $app.Refresh()
-          if ($app.HasExited) { throw "Guit.exe exited during start-up with code $($app.ExitCode)" }
-          $hasWindow = $app.MainWindowHandle -ne 0
-          "Launch smoke: running after 12 s, window created: $hasWindow, working set: {0:N0} MB" -f ($app.WorkingSet64 / 1MB) | Tee-Object -FilePath $env:GITHUB_STEP_SUMMARY -Append
-          Stop-Process -Id $app.Id -Force
-          if (-not $hasWindow) { throw "Guit.exe started but never created a window" }
+          $exe = Join-Path $dir.FullName 'Guit.exe'
+          $times = @()
+          $workingSet = 0
+          foreach ($run in 1..6) {
+            $watch = [Diagnostics.Stopwatch]::StartNew()
+            $app = Start-Process -FilePath $exe -PassThru
+            while ($app.MainWindowHandle -eq 0) {
+              if ($app.HasExited) { throw "Guit.exe exited during start-up with code $($app.ExitCode)" }
+              if ($watch.ElapsedMilliseconds -gt 30000) { Stop-Process -Id $app.Id -Force; throw "Guit.exe started but never created a window" }
+              Start-Sleep -Milliseconds 5
+              $app.Refresh()
+            }
+            $elapsed = $watch.ElapsedMilliseconds
+            Start-Sleep -Seconds 2
+            $app.Refresh()
+            if ($app.HasExited) { throw "Guit.exe exited right after showing its window, code $($app.ExitCode)" }
+            $workingSet = $app.WorkingSet64
+            Stop-Process -Id $app.Id -Force
+            $app.WaitForExit()
+            if ($run -gt 1) { $times += $elapsed }
+            "run ${run}: $elapsed ms"
+          }
+          $sorted = $times | Sort-Object
+          $median = $sorted[[int][Math]::Floor($sorted.Count / 2)]
+          "Start-up (process start to window): median {0} ms, min {1} ms, max {2} ms over {3} runs; working set {4:N0} MB" -f $median, $sorted[0], $sorted[-1], $sorted.Count, ($workingSet / 1MB) | Tee-Object -FilePath $env:GITHUB_STEP_SUMMARY -Append
+          if ($env:STARTUP_BUDGET_MS -and $median -gt [int]$env:STARTUP_BUDGET_MS) {
+            throw "Start-up median $median ms is over the budget of $env:STARTUP_BUDGET_MS ms"
+          }
       - uses: actions/upload-artifact@v4
         with:
           name: Guit-win-x64
