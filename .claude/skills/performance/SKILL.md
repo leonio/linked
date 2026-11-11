@@ -10,11 +10,11 @@ Rules first, measurement after. **Never claim something is faster without a numb
 
 ## Budgets (Release, Native AOT, win-x64)
 
-| Metric | Budget | Measured (CI, Nov 2026, .NET 10) | Where it is reported |
+| Metric | Budget | Measured (CI, Nov 2026, .NET 11) | Where it is reported |
 |---|---|---|---|
-| Start-up: process start to window, median of 5 | **x64 400 ms, ARM64 600 ms. CI fails above this.** | x64 211 ms, ARM64 294 ms | CI job summary "Launch and time start-up" |
-| `Guit.exe` size | do not grow it more than 5% in one task without saying why | 13.2 MB (x64) | CI job summary "Report binary size" |
-| Working set after start, signed out | watch the trend | 75 MB (x64), 84 MB (ARM64) | same summary line as start-up |
+| Start-up: process start to window, median of 5 | **x64 400 ms, ARM64 600 ms. CI fails above this.** | x64 187 ms, ARM64 261 ms | CI job summary "Launch and time start-up" |
+| `Guit.exe` size | do not grow it more than 5% in one task without saying why | 13.9 MB (x64) | CI job summary "Report binary size" |
+| Working set after start, signed out | watch the trend | 77 MB (x64), 86 MB (ARM64) | same summary line as start-up |
 | List scrolling | no dropped frames with 1,000 items | not measured yet | manual |
 
 The start-up budgets live in the job matrix of `.github/workflows/ci.yml` (`startup_budget_ms`). Hosted runners vary

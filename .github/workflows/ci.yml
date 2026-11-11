@@ -38,7 +38,7 @@ jobs:
       matrix:
         include:
           # startup_budget_ms: the job fails when the median start-up time is over this.
-          # Measured on these runners in November 2026: x64 about 210 ms, ARM64 about 290 ms.
+          # Measured on these runners in November 2026: x64 about 190-210 ms, ARM64 about 260-290 ms.
           - rid: win-x64
             platform: x64
             os: windows-latest

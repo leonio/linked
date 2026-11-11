@@ -47,5 +47,5 @@ Stop and report instead of adding it, unless the task card names the package. Th
   The csproj has `<PackageReference Include="X" />` with **no version**.
 - Latest stable version at the time of adding. Check: `https://api.nuget.org/v3-flatcontainer/<lowercase-id>/index.json`.
   No preview/rc packages unless the task card says so.
-- The target framework is set once in `Directory.Build.props` (`GuitNetVersion`). Never write `net10.0` in a csproj.
+- The target framework is set once in `Directory.Build.props` (`GuitNetVersion`). Never write `net11.0` in a csproj.
 - After any package change run the full verification in `aot-rules`: a package can compile and still break AOT.

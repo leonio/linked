@@ -1,7 +1,7 @@
 # Plan
 
 Guit is a native Windows client for GitHub: **sign in -> inbox (the feed) -> conversations (the messaging) -> Actions (the jobs)**.
-Stack: C# on .NET 10, WinUI 3 (Windows App SDK 2.x), Native AOT, Refit 16 generated clients,
+Stack: C# on .NET 11, WinUI 3 (Windows App SDK 2.x), Native AOT, Refit 16 generated clients,
 System.Text.Json source generation, CommunityToolkit.Mvvm source generators.
 
 How to use this file: take the first unticked task whose dependencies are ticked, open its card in
@@ -77,9 +77,10 @@ one layer, one or two files plus tests, a worked example to copy.
 - [x] 5.3 Settings page: theme, account, about
 - [x] 5.4 Keyboard and accessibility pass
 - [x] 5.5 ARM64 build in CI
-- [ ] 5.6 **[S][H]** MSIX packaging and signing
-- [ ] 5.7 **[S]** Move to .NET 11 and CsWinRT 3 when both are stable; compare size and start-up
-- [ ] 5.8 **[S]** Head-to-head: the same inbox page in C++/WinRT, measured against this app
+- [ ] 5.6 **[S][H]** MSIX packaging and signing (blocked: needs a signing certificate and a decision on distribution)
+- [x] 5.7a Move to .NET 11 (numbers in `docs/benchmarks.md`)
+- [ ] 5.7b **[S]** Move to CsWinRT 3 when it is stable (still a preview in November 2026)
+- [ ] 5.8 **[S][H]** Head-to-head: the same inbox page in C++/WinRT, measured against this app (needs a Windows machine with Visual Studio; the C# half is in `docs/benchmarks.md`)
 
 ## Known limits (decided, not to be "fixed" by a task)
 
