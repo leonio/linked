@@ -20,6 +20,13 @@ public sealed partial class InboxViewModel(
 
     private static readonly TimeSpan PollPeriod = TimeSpan.FromSeconds(60);
 
+    // Rows the list is meant to hold before the member has to scroll; a kind filter tops up to this.
+    private const int ComfortableRowCount = 15;
+    private const int MaxTopUpPages = 4;
+
+    // Everything loaded so far. Items is the part of it that matches Kind.
+    private readonly List<NotificationItem> _all = [];
+
     private int _page = 1;
     private int _generation;
     private ITimer? _pollTimer;
@@ -37,6 +44,13 @@ public sealed partial class InboxViewModel(
     /// <summary>Changing the filter reloads the list from the first page.</summary>
     [ObservableProperty]
     public partial InboxFilter Filter { get; set; }
+
+    /// <summary>
+    /// Shows only one kind of notification. GitHub cannot filter by kind, so this filters what has been
+    /// loaded and fetches a few more pages when too little is left to fill the list.
+    /// </summary>
+    [ObservableProperty]
+    public partial InboxKind Kind { get; set; }
 
     /// <summary>True while the last page that arrived was full, so there may be another.</summary>
     [ObservableProperty]
@@ -66,6 +80,7 @@ public sealed partial class InboxViewModel(
                 return;
             }
 
+            _all.Clear();
             Items.Clear();
             Append(page);
             _page = 1;
@@ -87,6 +102,30 @@ public sealed partial class InboxViewModel(
             {
                 IsLoading = false;
                 OnPropertyChanged(nameof(IsEmpty));
+            }
+        }
+
+        if (generation == _generation)
+        {
+            await TopUpAsync(cancellationToken);
+        }
+    }
+
+    /// <summary>
+    /// With a kind filter on, one page may hold few matching rows. Fetch more pages (a bounded number)
+    /// until the list is comfortably full, so the member is not left with a near-empty list that could scroll.
+    /// </summary>
+    [RelayCommand(AllowConcurrentExecutions = true)]
+    private async Task TopUpAsync(CancellationToken cancellationToken)
+    {
+        for (int i = 0; i < MaxTopUpPages && HasMore && Items.Count < ComfortableRowCount && ErrorMessage is null; i++)
+        {
+            int before = _page;
+            await LoadMoreAsync(cancellationToken);
+            if (_page == before)
+            {
+                // Nothing was fetched (another load is running, or it failed): do not spin.
+                return;
             }
         }
     }
@@ -113,6 +152,7 @@ public sealed partial class InboxViewModel(
             }
 
             ErrorMessage = null;
+            _all.Clear();
             Items.Clear();
             Append(page);
             _page = 1;
@@ -148,14 +188,14 @@ public sealed partial class InboxViewModel(
 
     private bool IsSameAsFirstPage(NotificationThread[] page)
     {
-        if (page.Length > Items.Count || (Items.Count <= PageSize && Items.Count != page.Length))
+        if (page.Length > _all.Count || (_all.Count <= PageSize && _all.Count != page.Length))
         {
             return false;
         }
 
         for (int i = 0; i < page.Length; i++)
         {
-            if (Items[i].Id != page[i].Id || Items[i].IsUnread != page[i].Unread)
+            if (_all[i].Id != page[i].Id || _all[i].IsUnread != page[i].Unread)
             {
                 return false;
             }
@@ -216,6 +256,7 @@ public sealed partial class InboxViewModel(
             await notifications.MarkAsReadAsync(item.Id, cancellationToken);
             if (Filter == InboxFilter.Unread)
             {
+                _all.Remove(item);
                 Items.Remove(item);
                 OnPropertyChanged(nameof(IsEmpty));
             }
@@ -241,6 +282,8 @@ public sealed partial class InboxViewModel(
             return;
         }
 
+        int indexInAll = _all.IndexOf(item!);
+        _all.Remove(item!);
         Items.RemoveAt(index);
         OnPropertyChanged(nameof(IsEmpty));
         try
@@ -249,11 +292,11 @@ public sealed partial class InboxViewModel(
         }
         catch (OperationCanceledException)
         {
-            Restore(index, item!);
+            Restore(index, indexInAll, item!);
         }
         catch (ApiExceptionBase ex)
         {
-            Restore(index, item!);
+            Restore(index, indexInAll, item!);
             ErrorMessage = ApiErrors.Describe(ex);
         }
     }
@@ -282,13 +325,40 @@ public sealed partial class InboxViewModel(
         await MarkAsReadAsync(item, cancellationToken);
     }
 
-    private void Restore(int index, NotificationItem item)
+    private void Restore(int index, int indexInAll, NotificationItem item)
     {
+        _all.Insert(Math.Clamp(indexInAll, 0, _all.Count), item);
         Items.Insert(Math.Min(index, Items.Count), item);
         OnPropertyChanged(nameof(IsEmpty));
     }
 
     partial void OnFilterChanged(InboxFilter value) => LoadCommand.Execute(null);
+
+    partial void OnKindChanged(InboxKind value)
+    {
+        Items.Clear();
+        foreach (NotificationItem item in _all)
+        {
+            if (Matches(item))
+            {
+                Items.Add(item);
+            }
+        }
+
+        OnPropertyChanged(nameof(IsEmpty));
+        TopUpCommand.Execute(null);
+    }
+
+    private bool Matches(NotificationItem item) => Kind switch
+    {
+        InboxKind.PullRequests => item.Kind == "PullRequest",
+        InboxKind.Issues => item.Kind == "Issue",
+        InboxKind.Releases => item.Kind == "Release",
+        InboxKind.Discussions => item.Kind == "Discussion",
+        InboxKind.Checks => item.Kind is "CheckSuite" or "WorkflowRun",
+        InboxKind.Other => item.Kind is not ("PullRequest" or "Issue" or "Release" or "Discussion" or "CheckSuite" or "WorkflowRun"),
+        _ => true,
+    };
 
     private Task<NotificationThread[]> ListPageAsync(int page, CancellationToken cancellationToken)
         => notifications.ListAsync(
@@ -303,7 +373,12 @@ public sealed partial class InboxViewModel(
         DateTimeOffset now = time.GetUtcNow();
         foreach (NotificationThread thread in page)
         {
-            Items.Add(NotificationItem.From(thread, now));
+            NotificationItem item = NotificationItem.From(thread, now);
+            _all.Add(item);
+            if (Matches(item))
+            {
+                Items.Add(item);
+            }
         }
     }
 }

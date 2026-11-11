@@ -1,4 +1,5 @@
 using System.Net;
+using Guit.Api.Notifications;
 using Guit.Core.Models;
 using Guit.Core.Services;
 using Guit.Core.ViewModels;
@@ -318,5 +319,107 @@ public sealed class InboxViewModelTests
 
         await Assert.That(viewModel.Items.Count).IsEqualTo(2);
         await Assert.That(viewModel.ErrorMessage).IsNull();
+    }
+
+    private static NotificationThread[] Mixed(int firstId, int pulls, int issues)
+    {
+        List<NotificationThread> threads = [];
+        for (int i = 0; i < pulls + issues; i++)
+        {
+            string id = (firstId + i).ToString(System.Globalization.CultureInfo.InvariantCulture);
+            threads.Add(i < pulls ? Sample.Thread(id) : Sample.Thread(id, type: "Issue", url: "https://api.github.com/repos/octocat/hello/issues/3"));
+        }
+
+        return [.. threads];
+    }
+
+    [Test]
+    public async Task A_kind_filter_shows_only_that_kind_without_asking_GitHub_again()
+    {
+        FakeNotificationsApi api = new([Sample.Thread("1"), Sample.Thread("2", type: "Issue"), Sample.Thread("3", type: "Release", url: null), Sample.Thread("4", type: "Commit", url: null)]);
+        InboxViewModel viewModel = Create(api);
+        await viewModel.LoadCommand.ExecuteAsync(null);
+
+        viewModel.Kind = InboxKind.Issues;
+        await Assert.That(viewModel.Items.Count).IsEqualTo(1);
+        await Assert.That(viewModel.Items[0].Id).IsEqualTo("2");
+
+        viewModel.Kind = InboxKind.Other;
+        await Assert.That(viewModel.Items[0].Id).IsEqualTo("4");
+
+        viewModel.Kind = InboxKind.All;
+        await Assert.That(viewModel.Items.Count).IsEqualTo(4);
+        await Assert.That(api.ListCalls.Count).IsEqualTo(1);
+    }
+
+    [Test]
+    public async Task A_kind_with_nothing_loaded_is_reported_as_empty()
+    {
+        InboxViewModel viewModel = Create(new FakeNotificationsApi(Sample.Threads(2)));
+        await viewModel.LoadCommand.ExecuteAsync(null);
+
+        viewModel.Kind = InboxKind.Discussions;
+
+        await Assert.That(viewModel.Items.Count).IsEqualTo(0);
+        await Assert.That(viewModel.IsEmpty).IsTrue();
+    }
+
+    [Test]
+    public async Task A_kind_filter_fetches_more_pages_until_the_list_is_comfortably_full()
+    {
+        // 50 per page, 5 issues in each: 15 issues need three pages.
+        FakeNotificationsApi api = new(Mixed(1, 45, 5), Mixed(51, 45, 5), Mixed(101, 45, 5), Mixed(151, 45, 5));
+        InboxViewModel viewModel = Create(api);
+        await viewModel.LoadCommand.ExecuteAsync(null);
+
+        viewModel.Kind = InboxKind.Issues;
+
+        await Assert.That(viewModel.Items.Count).IsEqualTo(15);
+        await Assert.That(api.ListCalls.Count).IsEqualTo(3);
+    }
+
+    [Test]
+    public async Task Topping_up_stops_after_a_few_pages_even_if_nothing_matches()
+    {
+        FakeNotificationsApi api = new(Sample.Threads(50), Sample.Threads(50, 51), Sample.Threads(50, 101), Sample.Threads(50, 151), Sample.Threads(50, 201), Sample.Threads(50, 251), Sample.Threads(50, 301));
+        InboxViewModel viewModel = Create(api);
+        await viewModel.LoadCommand.ExecuteAsync(null);
+
+        viewModel.Kind = InboxKind.Releases;
+
+        await Assert.That(viewModel.Items.Count).IsEqualTo(0);
+        await Assert.That(api.ListCalls.Count).IsEqualTo(5);
+    }
+
+    [Test]
+    public async Task Marking_done_under_a_kind_filter_keeps_the_hidden_rows()
+    {
+        FakeNotificationsApi api = new([Sample.Thread("1"), Sample.Thread("2", type: "Issue"), Sample.Thread("3")]);
+        InboxViewModel viewModel = Create(api);
+        await viewModel.LoadCommand.ExecuteAsync(null);
+        viewModel.Kind = InboxKind.Issues;
+
+        await viewModel.MarkAsDoneCommand.ExecuteAsync(viewModel.Items[0]);
+        viewModel.Kind = InboxKind.All;
+
+        await Assert.That(viewModel.Items.Count).IsEqualTo(2);
+        await Assert.That(viewModel.Items[0].Id).IsEqualTo("1");
+        await Assert.That(viewModel.Items[1].Id).IsEqualTo("3");
+    }
+
+    [Test]
+    public async Task A_failed_mark_done_under_a_kind_filter_restores_the_row_in_both_views()
+    {
+        FakeNotificationsApi api = new([Sample.Thread("1"), Sample.Thread("2", type: "Issue"), Sample.Thread("3")]);
+        InboxViewModel viewModel = Create(api);
+        await viewModel.LoadCommand.ExecuteAsync(null);
+        viewModel.Kind = InboxKind.Issues;
+        api.FailNextWith = HttpStatusCode.BadGateway;
+
+        await viewModel.MarkAsDoneCommand.ExecuteAsync(viewModel.Items[0]);
+        await Assert.That(viewModel.Items.Count).IsEqualTo(1);
+
+        viewModel.Kind = InboxKind.All;
+        await Assert.That(viewModel.Items[1].Id).IsEqualTo("2");
     }
 }
