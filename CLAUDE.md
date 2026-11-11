@@ -22,8 +22,8 @@ The point of the project: see how close C# + WinUI 3 + Native AOT can get to a C
 ## Layout
 
 ```
-src/Guit.Api    net10.0            Refit interfaces, DTO records, JSON context. No UI. Builds anywhere.
-src/Guit.Core   net10.0 + windows  View models, services, interfaces the app implements. No XAML types.
+src/Guit.Api    net11.0            Refit interfaces, DTO records, JSON context. No UI. Builds anywhere.
+src/Guit.Core   net11.0 + windows  View models, services, interfaces the app implements. No XAML types.
 src/Guit.App    windows only       WinUI 3 views, Windows-only services, composition root.
 tests/Guit.Api.Tests               TUnit + Refit.Testing (StubHttp). No network, ever.
 tests/Guit.Core.Tests              TUnit + hand-written fakes (Fakes.cs).

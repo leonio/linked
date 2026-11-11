@@ -3,7 +3,7 @@
 A native Windows client for GitHub - inbox, conversations, Actions - written in C# with WinUI 3 and compiled with
 Native AOT. The experiment: how close can C# and Microsoft's current tooling get to a C++/WinRT app?
 
-- **.NET 10, WinUI 3 (Windows App SDK 2.x), Native AOT**, unpackaged and self-contained
+- **.NET 11, WinUI 3 (Windows App SDK 2.x), Native AOT**, unpackaged and self-contained
 - **Refit 16** generated-only HTTP clients, **System.Text.Json** source generation - no reflection anywhere
 - **CommunityToolkit.Mvvm** source generators, `x:Bind` compiled bindings only
 - Sign-in with GitHub's device flow: no client secret in the app
