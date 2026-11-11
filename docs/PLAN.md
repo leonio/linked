@@ -60,8 +60,8 @@ one layer, one or two files plus tests, a worked example to copy.
 - [x] 4.1 Repositories API: list my repositories
 - [x] 4.2 Actions API: list workflow runs, list jobs for a run
 - [x] 4.3 `RunsViewModel` and `RunsPage`
-- [ ] 4.4 `JobsViewModel` and run detail page
-- [ ] 4.5 Re-run a workflow
+- [x] 4.4 `JobsViewModel` and run detail page
+- [x] 4.5 Re-run a workflow
 
 ## Phase 5 - Speed and shipping ([cards](tasks/phase-5-speed-and-shipping.md))
 
