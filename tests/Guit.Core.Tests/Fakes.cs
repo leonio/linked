@@ -204,6 +204,22 @@ internal sealed class FakeLauncher : ILauncher
     public void CopyToClipboard(string text) => Clipboard = text;
 }
 
+internal sealed class FakeSettingsStore : ISettingsStore
+{
+    public Dictionary<string, string> Values { get; } = [];
+
+    public string? Read(string key) => Values.GetValueOrDefault(key);
+
+    public void Write(string key, string value) => Values[key] = value;
+}
+
+internal sealed class FakeThemeService : IThemeService
+{
+    public List<AppTheme> Applied { get; } = [];
+
+    public void Apply(AppTheme theme) => Applied.Add(theme);
+}
+
 internal sealed class ImmediateDispatcher : IUiDispatcher
 {
     public void Post(Action action) => action();

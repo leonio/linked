@@ -20,6 +20,9 @@ using Microsoft.Extensions.DependencyInjection;
 ServiceCollection services = new();
 services.AddSingleton<ITokenStore, MemoryTokenStore>();
 services.AddSingleton<ILauncher, NullLauncher>();
+services.AddSingleton<ISettingsStore, MemorySettings>();
+services.AddSingleton<IThemeService, MemorySettings>();
+services.AddSingleton(new AppInfo("0.0.0-smoke"));
 services.AddSingleton<INavigator, NullNavigator>();
 services.AddSingleton<IUiDispatcher, InlineDispatcher>();
 services.AddSingleton(new GitHubOptions("smoke-client"));
@@ -104,6 +107,10 @@ ShellViewModel shell = provider.GetRequiredService<ShellViewModel>();
 await shell.LoadUserCommand.ExecuteAsync(null);
 Check(shell is { IsSignedIn: true, Login: "octocat" }, "shell view model");
 
+SettingsViewModel settings = provider.GetRequiredService<SettingsViewModel>();
+settings.ThemeIndex = (int)AppTheme.Dark;
+Check(settings is { Version: "0.0.0-smoke", Shell.Login: "octocat" } && SettingKeys.ReadTheme(provider.GetRequiredService<ISettingsStore>()) == AppTheme.Dark, "settings view model");
+
 // Last, because it signs the session out: a 401 from the API must end the session.
 try
 {
@@ -143,6 +150,19 @@ internal sealed class MemoryTokenStore : ITokenStore
 internal sealed class InlineDispatcher : IUiDispatcher
 {
     public void Post(Action action) => action();
+}
+
+internal sealed class MemorySettings : ISettingsStore, IThemeService
+{
+    private readonly Dictionary<string, string> _values = [];
+
+    public string? Read(string key) => _values.GetValueOrDefault(key);
+
+    public void Write(string key, string value) => _values[key] = value;
+
+    public void Apply(AppTheme theme)
+    {
+    }
 }
 
 internal sealed class NullNavigator : INavigator

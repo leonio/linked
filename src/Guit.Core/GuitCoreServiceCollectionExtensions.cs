@@ -12,7 +12,8 @@ public static class GuitCoreServiceCollectionExtensions
     /// <summary>
     /// Registers the API clients, services and view models. The caller must register
     /// <see cref="ITokenStore"/>, <see cref="ILauncher"/>, <see cref="IUiDispatcher"/>,
-    /// <see cref="INavigator"/> and <see cref="GitHubOptions"/>.
+    /// <see cref="INavigator"/>, <see cref="ISettingsStore"/>, <see cref="IThemeService"/>, <see cref="AppInfo"/>
+    /// and <see cref="GitHubOptions"/>.
     /// </summary>
     public static IServiceCollection AddGuitCore(this IServiceCollection services, Func<HttpMessageHandler>? primaryHandler = null)
     {
@@ -30,6 +31,7 @@ public static class GuitCoreServiceCollectionExtensions
         services.AddTransient<PullFilesViewModel>();
         services.AddTransient<PullRequestsViewModel>();
         services.AddSingleton<RunsViewModel>();
+        services.AddTransient<SettingsViewModel>();
         services.AddSingleton<ShellViewModel>();
         services.AddTransient<SignInViewModel>();
         return services;
