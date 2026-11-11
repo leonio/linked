@@ -25,6 +25,7 @@ public static class GuitCoreServiceCollectionExtensions
         // View models. Shell-level ones are singletons; page-level ones are transient. Keep sorted.
         services.AddTransient<ConversationViewModel>();
         services.AddTransient<InboxViewModel>();
+        services.AddTransient<JobLogViewModel>();
         services.AddTransient<JobsViewModel>();
         services.AddTransient<PullRequestsViewModel>();
         services.AddSingleton<RunsViewModel>();

@@ -34,3 +34,22 @@ public readonly record struct RunLink(string Owner, string Repo, long RunId)
 
     public Uri ToWebUri() => new(string.Create(CultureInfo.InvariantCulture, $"https://github.com/{Owner}/{Repo}/actions/runs/{RunId}"));
 }
+
+/// <summary>Identifies one job's log. Travels between pages as "owner/repo@jobId" + tab + job name.</summary>
+public readonly record struct JobLogLink(string Owner, string Repo, long JobId, string JobName)
+{
+    public static bool TryParseArgument(string? argument, out JobLogLink link)
+    {
+        link = default;
+        int tab = argument?.IndexOf('\t', StringComparison.Ordinal) ?? -1;
+        if (tab < 0 || !RunLink.TryParseArgument(argument![..tab], out RunLink job))
+        {
+            return false;
+        }
+
+        link = new JobLogLink(job.Owner, job.Repo, job.RunId, argument[(tab + 1)..]);
+        return true;
+    }
+
+    public string ToArgument() => new RunLink(Owner, Repo, JobId).ToArgument() + "\t" + JobName;
+}

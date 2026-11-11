@@ -80,7 +80,10 @@ await runsViewModel.LoadRepositoriesCommand.ExecuteAsync(null);
 Check(runsViewModel is { SelectedRepository: "octocat/hello", Runs: [{ StatusKind: "running", Detail: "CI #12 \u00B7 push \u00B7 main" }] }, "runs view model");
 JobsViewModel jobsViewModel = provider.GetRequiredService<JobsViewModel>();
 await jobsViewModel.LoadCommand.ExecuteAsync("octocat/hello@30433642");
-Check(jobsViewModel is { Title: "Fix it", StatusKind: "running", Jobs: [{ Name: "build", Duration: "2m 05s" }] }, "jobs view model");
+Check(jobsViewModel is { Title: "Fix it", StatusKind: "running", Jobs: [{ Name: "build", Duration: "2m 05s", IsStep: false }, { Name: "Build", IsStep: true }] }, "jobs view model");
+JobLogViewModel jobLog = provider.GetRequiredService<JobLogViewModel>();
+await jobLog.LoadCommand.ExecuteAsync("octocat/hello@399444496\tbuild");
+Check(jobLog is { Title: "build", Lines: ["hello"] }, "job log view model");
 
 InboxViewModel inbox = provider.GetRequiredService<InboxViewModel>();
 await inbox.LoadCommand.ExecuteAsync(null);

@@ -111,7 +111,10 @@ internal static class Sample
         return runs;
     }
 
-    public static Job Job(long id, string name = "build", string status = "completed", string? conclusion = "success", int? seconds = 60)
+    public static JobStep Step(int number, string name, string status = "completed", string? conclusion = "success", int? seconds = 5)
+        => new(name, status, number, conclusion, status == "queued" ? null : Now.AddMinutes(-10), seconds is { } s ? Now.AddMinutes(-10).AddSeconds(s) : null);
+
+    public static Job Job(long id, string name = "build", string status = "completed", string? conclusion = "success", int? seconds = 60, JobStep[]? steps = null)
         => new(
             id,
             name,
@@ -119,7 +122,8 @@ internal static class Sample
             Now.AddMinutes(-10),
             $"https://github.com/octocat/hello/actions/runs/30433012/job/{id}",
             conclusion,
-            seconds is { } s ? Now.AddMinutes(-10).AddSeconds(s) : null);
+            seconds is { } s ? Now.AddMinutes(-10).AddSeconds(s) : null,
+            steps);
 
     public static ReactionRollup Reactions(int plusOne = 0, int heart = 0, int rocket = 0)
         => new(plusOne + heart + rocket, plusOne, 0, 0, 0, heart, 0, 0, rocket);

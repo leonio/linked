@@ -46,11 +46,16 @@ public sealed partial class RunItem
     }
 }
 
-/// <summary>One job of a workflow run.</summary>
+/// <summary>
+/// One row of the run detail list: a job, or one step of a job (shown indented under it).
+/// A flat list keeps the page a single virtualised ListView.
+/// </summary>
 public sealed partial class JobItem
 {
     private JobItem(Job job)
     {
+        JobId = job.Id;
+        JobName = job.Name;
         Name = job.Name;
         StatusKind = RunStatus.Kind(job.Status, job.Conclusion);
         StatusGlyph = RunStatus.Glyph(StatusKind);
@@ -58,6 +63,29 @@ public sealed partial class JobItem
         WebUrl = job.HtmlUrl;
     }
 
+    private JobItem(Job job, JobStep step)
+    {
+        IsStep = true;
+        JobId = job.Id;
+        JobName = job.Name;
+        Name = step.Name;
+        StatusKind = RunStatus.Kind(step.Status, step.Conclusion);
+        StatusGlyph = RunStatus.Glyph(StatusKind);
+        Duration = step is { StartedAt: { } started, CompletedAt: { } completed }
+            ? FormatDuration(completed - started)
+            : StatusKind is RunStatus.Running or RunStatus.Queued ? StatusKind : string.Empty;
+        WebUrl = job.HtmlUrl;
+    }
+
+    /// <summary>True for a step row, false for a job row.</summary>
+    public bool IsStep { get; }
+
+    /// <summary>The job this row is, or belongs to.</summary>
+    public long JobId { get; }
+
+    public string JobName { get; }
+
+    /// <summary>The job name, or the step name.</summary>
     public string Name { get; }
 
     public string StatusKind { get; }
@@ -73,6 +101,13 @@ public sealed partial class JobItem
     {
         ArgumentNullException.ThrowIfNull(job);
         return new JobItem(job);
+    }
+
+    public static JobItem FromStep(Job job, JobStep step)
+    {
+        ArgumentNullException.ThrowIfNull(job);
+        ArgumentNullException.ThrowIfNull(step);
+        return new JobItem(job, step);
     }
 
     internal static string FormatDuration(TimeSpan duration)

@@ -8,6 +8,8 @@ public enum Route
     Conversation,
     Runs,
     RunDetail,
+    JobLog,
+    PullFiles,
     Settings,
 }
 
