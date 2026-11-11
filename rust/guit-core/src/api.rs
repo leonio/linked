@@ -190,7 +190,7 @@ impl<'a, T: Transport + ?Sized> GitHub<'a, T> {
 }
 
 /// A canned transport for tests: replies in order and records what was sent.
-#[cfg(any(test, feature = "test-support"))]
+#[cfg(test)]
 pub mod testing {
     use std::cell::RefCell;
     use std::collections::VecDeque;

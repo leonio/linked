@@ -269,7 +269,7 @@ fn sign_in_view(sign_in: &SignIn, context: &ViewContext<Guit>) -> View {
     }
 
     if let Some(error) = &sign_in.error {
-        children.push(error_bar(error));
+        children.push(error_bar(error).into());
     }
 
     StackPanel::new()
@@ -311,23 +311,21 @@ fn shell_view(shell: &Shell, context: &ViewContext<Guit>) -> View {
         ));
 
     let list = ListView::new()
-        .grid_row(1)
         .selection_mode(ListViewSelectionMode::Single)
         .on_selection_changed(context.callback(|index: Option<usize>| index.map_or(Message::Refresh, Message::Open)))
         .items(shell.items.iter().map(|item| DataItem::new(item.id.as_str(), item.title.as_str()).content(row(item))));
 
     let mut layers: Vec<View> = vec![list.into()];
     if shell.loading {
-        layers.push(ProgressRing::new().grid_row(1).is_active(true).into());
+        layers.push(ProgressRing::new().is_active(true).into());
     } else if let Some(error) = &shell.error {
-        layers.push(error_bar(error).grid_row(1).vertical_alignment(VerticalAlignment::Top).margin(Thickness::new(24.0, 0.0, 24.0, 0.0)));
+        layers.push(error_bar(error).vertical_alignment(VerticalAlignment::Top).margin(Thickness::new(24.0, 0.0, 24.0, 0.0)).into());
     } else if shell.items.is_empty() {
         layers.push(
             TextBlock::new()
                 .text("You're all caught up")
                 .font_size(20.0)
                 .opacity(0.6)
-                .grid_row(1)
                 .horizontal_alignment(HorizontalAlignment::Center)
                 .vertical_alignment(VerticalAlignment::Center)
                 .into(),
@@ -367,8 +365,8 @@ fn row(item: &NotificationItem) -> View {
         .into()
 }
 
-fn error_bar(message: &str) -> View {
-    InfoBar::new().is_open(true).is_closable(false).severity(InfoBarSeverity::Error).message(message).into()
+fn error_bar(message: &str) -> InfoBar {
+    InfoBar::new().is_open(true).is_closable(false).severity(InfoBarSeverity::Error).message(message)
 }
 
 fn main() {

@@ -19,7 +19,7 @@ windows = { workspace = true, features = [
     "Storage_Streams",
     "System",
     "Web_Http_Headers",
-    "Win32_System_Com",
+    "combaseapi",
 ] }
 
 [build-dependencies]

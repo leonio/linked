@@ -10,7 +10,7 @@ use windows::Security::Credentials::{PasswordCredential, PasswordVault};
 use windows::Storage::Streams::UnicodeEncoding;
 use windows::System::Launcher;
 use windows::Web::Http::{HttpClient, HttpMethod, HttpRequestMessage, HttpStringContent};
-use windows::Win32::System::Com::CoIncrementMTAUsage;
+use windows::Win32::{CO_MTA_USAGE_COOKIE, CoIncrementMTAUsage};
 use windows::core::{HSTRING, Result, h};
 
 // The same credential the C# app stores, so signing in with either build signs in both.
@@ -20,8 +20,9 @@ const VAULT_USER: &HSTRING = h!("github");
 /// Call once at start-up. Keeps a multithreaded COM apartment alive for the process, so the
 /// background threads that make HTTP calls can use WinRT without initialising COM themselves.
 pub fn initialize() {
-    // SAFETY: no preconditions; the returned cookie is deliberately never released.
-    _ = unsafe { CoIncrementMTAUsage() };
+    let mut cookie = CO_MTA_USAGE_COOKIE::default();
+    // SAFETY: `cookie` is a valid place for the result; it is deliberately never released.
+    _ = unsafe { CoIncrementMTAUsage(&mut cookie) };
 }
 
 /// HTTP over `Windows.Web.Http`. One client for the process, so connections are reused.
@@ -61,13 +62,13 @@ impl WinRtTransport {
         let reply = Self::client()?.SendRequestAsync(&message)?.join()?;
         let mut reply_headers = Vec::new();
         for pair in reply.Headers()? {
-            reply_headers.push((pair.Key()?.to_string().to_ascii_lowercase(), pair.Value()?.to_string()));
+            reply_headers.push((pair.Key()?.to_string_lossy().to_ascii_lowercase(), pair.Value()?.to_string_lossy()));
         }
 
         Ok(Response {
             status: reply.StatusCode()?.0 as u16,
             headers: reply_headers,
-            body: reply.Content()?.ReadAsStringAsync()?.join()?.to_string(),
+            body: reply.Content()?.ReadAsStringAsync()?.join()?.to_string_lossy(),
         })
     }
 }
@@ -82,7 +83,7 @@ impl Transport for WinRtTransport {
 pub fn load_token() -> Option<String> {
     let credential = PasswordVault::new().ok()?.Retrieve(VAULT_RESOURCE, VAULT_USER).ok()?;
     credential.RetrievePassword().ok()?;
-    credential.Password().ok().map(|password| password.to_string()).filter(|token| !token.is_empty())
+    credential.Password().ok().map(|password| password.to_string_lossy()).filter(|token| !token.is_empty())
 }
 
 pub fn save_token(token: &str) {
