@@ -1,7 +1,7 @@
 <Project>
   <!-- Single source of truth for framework + language settings. Projects must not override these. -->
   <PropertyGroup>
-    <GuitNetVersion>net10.0</GuitNetVersion>
+    <GuitNetVersion>net11.0</GuitNetVersion>
     <GuitWindowsTfm>$(GuitNetVersion)-windows10.0.26100.0</GuitWindowsTfm>
     <GuitWindowsMinVersion>10.0.19041.0</GuitWindowsMinVersion>
 
