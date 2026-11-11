@@ -1,4 +1,5 @@
 using System.Net;
+using Guit.Api.Actions;
 using Guit.Api.Auth;
 using Guit.Api.Http;
 using Guit.Api.Issues;
@@ -83,6 +84,42 @@ internal static class Sample
 
         return items;
     }
+
+    public static WorkflowRun Run(int number, string? status = "completed", string? conclusion = "success", long? id = null)
+        => new(
+            id ?? 30433000 + number,
+            "Fix it",
+            number,
+            "push",
+            Now.AddHours(-4),
+            Now.AddHours(-3),
+            $"https://github.com/octocat/hello/actions/runs/{id ?? 30433000 + number}",
+            "CI",
+            status,
+            conclusion,
+            "main",
+            Octocat);
+
+    public static WorkflowRun[] Runs(int count, int firstNumber = 1)
+    {
+        WorkflowRun[] runs = new WorkflowRun[count];
+        for (int i = 0; i < count; i++)
+        {
+            runs[i] = Run(firstNumber + i);
+        }
+
+        return runs;
+    }
+
+    public static Job Job(long id, string name = "build", string status = "completed", string? conclusion = "success", int? seconds = 60)
+        => new(
+            id,
+            name,
+            status,
+            Now.AddMinutes(-10),
+            $"https://github.com/octocat/hello/actions/runs/30433012/job/{id}",
+            conclusion,
+            seconds is { } s ? Now.AddMinutes(-10).AddSeconds(s) : null);
 
     public static ReactionRollup Reactions(int plusOne = 0, int heart = 0, int rocket = 0)
         => new(plusOne + heart + rocket, plusOne, 0, 0, 0, heart, 0, 0, rocket);
