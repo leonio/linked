@@ -5,6 +5,7 @@
     <GuitWindowsTfm>$(GuitNetVersion)-windows10.0.26100.0</GuitWindowsTfm>
     <GuitWindowsMinVersion>10.0.19041.0</GuitWindowsMinVersion>
 
+    <Version>0.1.0</Version>
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
