@@ -149,6 +149,58 @@ pub struct Issue {
     pub body_html: Option<String>,
     /// Present (whatever its content) when this issue is a pull request.
     pub pull_request: Option<serde_json::Value>,
+    pub reactions: Option<ReactionRollup>,
+}
+
+/// Schema: reaction-rollup. The thumbs are named "+1" and "-1" in JSON.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Default)]
+pub struct ReactionRollup {
+    #[serde(rename = "+1")]
+    pub plus_one: u32,
+    #[serde(rename = "-1")]
+    pub minus_one: u32,
+    pub laugh: u32,
+    pub hooray: u32,
+    pub confused: u32,
+    pub heart: u32,
+    pub rocket: u32,
+    pub eyes: u32,
+}
+
+/// Schema: pull-request. Only what the conversation header shows.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+pub struct PullRequest {
+    /// "open" or "closed". A merged pull request is "closed" with `merged` true.
+    pub state: String,
+    pub merged: bool,
+    pub draft: Option<bool>,
+    pub additions: u32,
+    pub deletions: u32,
+    pub changed_files: u32,
+    pub head: PullBranch,
+    pub base: PullBranch,
+}
+
+/// Schema: pull-request.head / pull-request.base.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+pub struct PullBranch {
+    /// The branch name.
+    #[serde(rename = "ref")]
+    pub name: String,
+    /// "owner:branch".
+    pub label: String,
+}
+
+/// Schema: diff-entry. One changed file of a pull request.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+pub struct PullFile {
+    pub filename: String,
+    pub status: String,
+    pub additions: u32,
+    pub deletions: u32,
+    /// The unified diff. Missing for binary files and very large diffs.
+    pub patch: Option<String>,
+    pub previous_filename: Option<String>,
 }
 
 /// Schema: issue-comment.
@@ -160,6 +212,7 @@ pub struct IssueComment {
     pub body_text: Option<String>,
     pub body_html: Option<String>,
     pub author_association: Option<String>,
+    pub reactions: Option<ReactionRollup>,
 }
 
 /// Reply of `GET /repos/{owner}/{repo}/actions/runs`.
@@ -466,6 +519,79 @@ impl<'a, T: Transport + ?Sized> GitHub<'a, T> {
         );
         request.method = "POST";
         self.send(&request).map(|_| ())
+    }
+
+    /// operationId: pulls/get
+    pub fn pull(
+        &self,
+        token: &str,
+        owner: &str,
+        repo: &str,
+        number: u32,
+    ) -> Result<PullRequest, ApiError> {
+        let url = format!(
+            "{API}/repos/{}/{}/pulls/{number}",
+            encode(owner),
+            encode(repo)
+        );
+        self.json(&Self::authorized(Request::get(url), token))
+    }
+
+    /// operationId: pulls/list-files. At most 100 per page.
+    pub fn pull_files(
+        &self,
+        token: &str,
+        owner: &str,
+        repo: &str,
+        number: u32,
+        page: u32,
+        per_page: u32,
+    ) -> Result<Vec<PullFile>, ApiError> {
+        let url = format!(
+            "{API}/repos/{}/{}/pulls/{number}/files?page={page}&per_page={per_page}",
+            encode(owner),
+            encode(repo)
+        );
+        self.json(&Self::authorized(Request::get(url), token))
+    }
+
+    /// operationId: reactions/create-for-issue (also the opening post of a pull request).
+    /// `content` is one of "+1", "-1", "laugh", "hooray", "confused", "heart", "rocket", "eyes".
+    pub fn react_to_issue(
+        &self,
+        token: &str,
+        owner: &str,
+        repo: &str,
+        number: u32,
+        content: &str,
+    ) -> Result<(), ApiError> {
+        let url = format!(
+            "{API}/repos/{}/{}/issues/{number}/reactions",
+            encode(owner),
+            encode(repo)
+        );
+        let json = serde_json::json!({ "content": content }).to_string();
+        self.send(&Self::authorized(Request::post_json(url, json), token))
+            .map(|_| ())
+    }
+
+    /// operationId: reactions/create-for-issue-comment
+    pub fn react_to_comment(
+        &self,
+        token: &str,
+        owner: &str,
+        repo: &str,
+        comment_id: u64,
+        content: &str,
+    ) -> Result<(), ApiError> {
+        let url = format!(
+            "{API}/repos/{}/{}/issues/comments/{comment_id}/reactions",
+            encode(owner),
+            encode(repo)
+        );
+        let json = serde_json::json!({ "content": content }).to_string();
+        self.send(&Self::authorized(Request::post_json(url, json), token))
+            .map(|_| ())
     }
 
     /// Like `authorized`, but asks for the "full" media type so replies carry `body_text` next to the Markdown.
@@ -810,6 +936,84 @@ mod tests {
         assert_eq!(jobs[0].steps[1].started_at, None);
         assert!(jobs[1].steps.is_empty());
         assert_eq!(log, "line one\nline two\n");
+    }
+
+    #[test]
+    fn pull_requests_files_and_reactions() {
+        let transport = Canned::new()
+            .reply(200, r#"{"number":7,"state":"closed","merged":true,"draft":false,"additions":120,"deletions":8,"changed_files":5,
+                "head":{"ref":"feature","label":"contributor:feature","sha":"abc"},"base":{"ref":"main","label":"octocat:main"}}"#)
+            .reply(200, r#"[{"filename":"src/a.cs","status":"modified","additions":2,"deletions":1,"patch":"@@ -1 +1 @@\n-a\n+b"},
+                {"filename":"logo.png","status":"added","additions":0,"deletions":0},
+                {"filename":"b.cs","status":"renamed","additions":0,"deletions":0,"previous_filename":"old.cs"}]"#)
+            .reply(200, r#"{"id":1,"content":"heart"}"#)
+            .reply(201, r#"{"id":2,"content":"+1"}"#);
+        let github = GitHub::new(&transport);
+
+        let pull = github.pull("tok", "octocat", "hello", 7).unwrap();
+        let files = github
+            .pull_files("tok", "octocat", "hello", 7, 2, 100)
+            .unwrap();
+        github
+            .react_to_issue("tok", "octocat", "hello", 7, "heart")
+            .unwrap();
+        github
+            .react_to_comment("tok", "octocat", "hello", 4_242_424_242, "+1")
+            .unwrap();
+
+        let sent = transport.sent.borrow();
+        assert_eq!(
+            sent[0].url,
+            "https://api.github.com/repos/octocat/hello/pulls/7"
+        );
+        assert_eq!(
+            sent[1].url,
+            "https://api.github.com/repos/octocat/hello/pulls/7/files?page=2&per_page=100"
+        );
+        assert_eq!(
+            sent[2].url,
+            "https://api.github.com/repos/octocat/hello/issues/7/reactions"
+        );
+        assert_eq!(
+            sent[2].body,
+            Some(("application/json", r#"{"content":"heart"}"#.to_string()))
+        );
+        assert_eq!(
+            sent[3].url,
+            "https://api.github.com/repos/octocat/hello/issues/comments/4242424242/reactions"
+        );
+        assert_eq!(
+            sent[3].body,
+            Some(("application/json", r#"{"content":"+1"}"#.to_string()))
+        );
+        assert!(pull.merged);
+        assert_eq!(
+            (
+                pull.head.name.as_str(),
+                pull.head.label.as_str(),
+                pull.base.name.as_str()
+            ),
+            ("feature", "contributor:feature", "main")
+        );
+        assert_eq!(files[0].patch.as_deref(), Some("@@ -1 +1 @@\n-a\n+b"));
+        assert_eq!(files[1].patch, None);
+        assert_eq!(files[2].previous_filename.as_deref(), Some("old.cs"));
+    }
+
+    #[test]
+    fn reaction_rollups_map_the_thumbs() {
+        let transport = Canned::new().reply(200, r#"[{"id":11,"created_at":"2026-01-02T00:00:00Z","user":null,
+            "reactions":{"total_count":3,"+1":2,"-1":0,"laugh":0,"confused":0,"heart":1,"hooray":0,"eyes":0,"rocket":0}}]"#);
+
+        let comments = GitHub::new(&transport)
+            .issue_comments("tok", "o", "r", 1, 1, 100)
+            .unwrap();
+
+        let reactions = comments[0].reactions.unwrap();
+        assert_eq!(
+            (reactions.plus_one, reactions.heart, reactions.rocket),
+            (2, 1, 0)
+        );
     }
 
     #[test]

@@ -8,6 +8,7 @@ pub mod actions;
 pub mod api;
 pub mod conversation;
 pub mod device_flow;
+pub mod diff;
 pub mod http;
 pub mod inbox;
 pub mod link;

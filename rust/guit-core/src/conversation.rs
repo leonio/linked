@@ -1,6 +1,6 @@
 //! Rows for the pull requests page and the conversation page. Mirrors the C# `PullRequestItem` and `CommentItem`.
 
-use crate::api::{Issue, IssueComment, IssueSearchItem, User};
+use crate::api::{Issue, IssueComment, IssueSearchItem, PullRequest, ReactionRollup, User};
 use crate::inbox::small_avatar;
 use crate::link::SubjectLink;
 use crate::rich::{self, Block};
@@ -93,9 +93,106 @@ pub struct CommentItem {
     pub posted: String,
     /// "member", "owner", "contributor"... or `None` when the author has no special relation to the repository.
     pub association: Option<String>,
+    /// Counts in the order of `REACTIONS`.
+    pub reactions: [u32; 8],
+}
+
+/// The reactions GitHub accepts, in the order GitHub shows them: the API name and the emoji.
+pub const REACTIONS: [(&str, &str); 8] = [
+    ("+1", "\u{1F44D}"),
+    ("-1", "\u{1F44E}"),
+    ("laugh", "\u{1F604}"),
+    ("hooray", "\u{1F389}"),
+    ("confused", "\u{1F615}"),
+    ("heart", "\u{2764}\u{FE0F}"),
+    ("rocket", "\u{1F680}"),
+    ("eyes", "\u{1F440}"),
+];
+
+fn counts(rollup: Option<&ReactionRollup>) -> [u32; 8] {
+    rollup.map_or([0; 8], |r| {
+        [
+            r.plus_one,
+            r.minus_one,
+            r.laugh,
+            r.hooray,
+            r.confused,
+            r.heart,
+            r.rocket,
+            r.eyes,
+        ]
+    })
+}
+
+/// What the header of a pull request's conversation adds to an issue's.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct PullHeader {
+    /// "open", "closed", "merged" or "draft".
+    pub state: String,
+    /// "feature → main"; across forks the source is "owner:branch".
+    pub branches: String,
+    /// "+120 −8 in 5 files".
+    pub diff_summary: String,
+}
+
+impl PullHeader {
+    pub fn from_pull(pull: &PullRequest) -> Self {
+        let state = if pull.merged {
+            "merged"
+        } else if pull.state == "closed" {
+            "closed"
+        } else if pull.draft == Some(true) {
+            "draft"
+        } else {
+            "open"
+        };
+        let owner = |label: &str| {
+            label
+                .split_once(':')
+                .map_or(String::new(), |(owner, _)| owner.to_string())
+        };
+        let source = if owner(&pull.head.label) == owner(&pull.base.label) {
+            &pull.head.name
+        } else {
+            &pull.head.label
+        };
+        Self {
+            state: state.to_string(),
+            branches: format!("{source} \u{2192} {}", pull.base.name),
+            diff_summary: format!(
+                "+{} \u{2212}{} in {} {}",
+                pull.additions,
+                pull.deletions,
+                pull.changed_files,
+                if pull.changed_files == 1 {
+                    "file"
+                } else {
+                    "files"
+                }
+            ),
+        }
+    }
 }
 
 impl CommentItem {
+    /// The non-zero reaction counts as one line, for example "👍 3  ❤️ 1". Empty when there are none.
+    pub fn reaction_summary(&self) -> String {
+        REACTIONS
+            .iter()
+            .zip(self.reactions)
+            .filter(|(_, count)| *count > 0)
+            .map(|((_, emoji), count)| format!("{emoji} {count}"))
+            .collect::<Vec<_>>()
+            .join("  ")
+    }
+
+    /// Changes one reaction count by `delta`. Unknown names are ignored.
+    pub fn adjust_reaction(&mut self, content: &str, delta: i32) {
+        if let Some(index) = REACTIONS.iter().position(|(name, _)| *name == content) {
+            self.reactions[index] = self.reactions[index].saturating_add_signed(delta);
+        }
+    }
+
     pub fn from_issue(issue: &Issue, now: i64) -> Self {
         Self {
             id: issue.id,
@@ -106,6 +203,7 @@ impl CommentItem {
             content: content(issue.body_html.as_deref(), issue.body_text.as_deref()),
             posted: age(&issue.created_at, now),
             association: None,
+            reactions: counts(issue.reactions.as_ref()),
         }
     }
 
@@ -123,6 +221,7 @@ impl CommentItem {
                 .as_deref()
                 .filter(|association| *association != "NONE")
                 .map(|association| association.to_lowercase().replace('_', " ")),
+            reactions: counts(comment.reactions.as_ref()),
         }
     }
 }
@@ -215,6 +314,11 @@ mod tests {
             body_text: Some("Please review".into()),
             body_html: Some("<p>Please <strong>review</strong></p>".into()),
             pull_request: None,
+            reactions: Some(ReactionRollup {
+                plus_one: 3,
+                heart: 1,
+                ..ReactionRollup::default()
+            }),
         };
         let comment = IssueComment {
             id: 11,
@@ -223,6 +327,7 @@ mod tests {
             body_text: None,
             body_html: None,
             author_association: Some("FIRST_TIME_CONTRIBUTOR".into()),
+            reactions: None,
         };
 
         let opening = CommentItem::from_issue(&issue, NOW);
@@ -241,6 +346,19 @@ mod tests {
         assert!(opening.content[0].inlines[1].bold);
         assert_eq!(opening.content[0].inlines[1].text, "review");
         assert!(reply.content.is_empty());
+        assert_eq!(
+            opening.reaction_summary(),
+            "\u{1F44D} 3  \u{2764}\u{FE0F} 1"
+        );
+        assert_eq!(reply.reaction_summary(), "");
+
+        let mut reacted = reply.clone();
+        reacted.adjust_reaction("rocket", 1);
+        reacted.adjust_reaction("nonsense", 1);
+        assert_eq!(reacted.reaction_summary(), "\u{1F680} 1");
+        reacted.adjust_reaction("rocket", -1);
+        reacted.adjust_reaction("rocket", -1);
+        assert_eq!(reacted.reaction_summary(), "");
         assert_eq!((reply.author.as_str(), reply.body.as_str()), ("ghost", ""));
         assert_eq!(reply.association.as_deref(), Some("first time contributor"));
 
@@ -249,5 +367,53 @@ mod tests {
             ..comment
         };
         assert_eq!(CommentItem::from_comment(&plain, NOW).association, None);
+    }
+
+    #[test]
+    fn a_pull_request_header_describes_state_branches_and_size() {
+        use crate::api::PullBranch;
+        let pull =
+            |state: &str, merged: bool, draft: bool, head_label: &str, files: u32| PullRequest {
+                state: state.into(),
+                merged,
+                draft: Some(draft),
+                additions: 120,
+                deletions: 8,
+                changed_files: files,
+                head: PullBranch {
+                    name: "feature".into(),
+                    label: head_label.into(),
+                },
+                base: PullBranch {
+                    name: "main".into(),
+                    label: "octocat:main".into(),
+                },
+            };
+
+        let open = PullHeader::from_pull(&pull("open", false, false, "octocat:feature", 5));
+        assert_eq!(open.state, "open");
+        assert_eq!(open.branches, "feature \u{2192} main");
+        assert_eq!(open.diff_summary, "+120 \u{2212}8 in 5 files");
+
+        assert_eq!(
+            PullHeader::from_pull(&pull("open", false, true, "octocat:feature", 1)).state,
+            "draft"
+        );
+        assert_eq!(
+            PullHeader::from_pull(&pull("closed", false, true, "octocat:feature", 1)).state,
+            "closed"
+        );
+        assert_eq!(
+            PullHeader::from_pull(&pull("closed", true, false, "octocat:feature", 1)).state,
+            "merged"
+        );
+        assert_eq!(
+            PullHeader::from_pull(&pull("open", false, false, "contributor:feature", 1)).branches,
+            "contributor:feature \u{2192} main"
+        );
+        assert_eq!(
+            PullHeader::from_pull(&pull("open", false, false, "octocat:feature", 1)).diff_summary,
+            "+120 \u{2212}8 in 1 file"
+        );
     }
 }
