@@ -15,12 +15,13 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use actions::{Actions, JobLog, RunDetail};
 use guit_core::actions::{JobRow, RunItem, log_lines};
 use guit_core::api::{ApiError, DeviceCode, GitHub, User};
-use guit_core::conversation::{CommentItem, PullRequestItem, PullRequestScope};
+use guit_core::conversation::{CommentItem, PullHeader, PullRequestItem, PullRequestScope};
 use guit_core::device_flow::{DeviceFlowOutcome, wait_for_token};
+use guit_core::diff::{self, DiffRow};
 use guit_core::inbox::{Filter, Inbox, Kind, NotificationItem, PageRequest, Removed};
 use guit_core::{GITHUB_CLIENT_ID, GITHUB_SCOPES};
 use platform::WinRtTransport;
-use pulls::{Conversation, Pulls};
+use pulls::{Conversation, Files, Pulls};
 use windows_reactor::*;
 
 /// How often the inbox checks for changes in the background.
@@ -92,6 +93,30 @@ pub(crate) enum Message {
     },
     CloseLog,
 
+    LoadMoreComments,
+    MoreCommentsLoaded {
+        reference: String,
+        result: Result<Vec<CommentItem>, ApiError>,
+    },
+    React {
+        comment_id: u64,
+        content: String,
+    },
+    ReactFinished {
+        reference: String,
+        comment_id: u64,
+        content: String,
+        error: Option<String>,
+    },
+    ShowFiles,
+    LoadMoreFiles,
+    FilesLoaded {
+        reference: String,
+        page: u32,
+        result: Result<Vec<DiffRow>, ApiError>,
+    },
+    CloseFiles,
+
     // The shell.
     Navigate(Option<String>),
 
@@ -125,6 +150,9 @@ pub(crate) struct LoadedConversation {
     title: String,
     state: String,
     comments: Vec<CommentItem>,
+    /// Set for a pull request whose details could be fetched.
+    pull: Option<PullHeader>,
+    has_more: bool,
 }
 
 /// The sections in the navigation pane.
@@ -247,11 +275,12 @@ impl Shell {
         context: &ComponentContext<Guit>,
     ) {
         let token = self.token.clone();
-        let (owner, repo, number, reference) = (
+        let (owner, repo, number, reference, is_pull) = (
             link.owner.clone(),
             link.repo.clone(),
             link.number,
             link.reference(),
+            link.is_pull_request,
         );
         self.conversation = Some(Conversation::opening(link));
         _ = context.spawn_background(move |_| {
@@ -261,6 +290,11 @@ impl Shell {
                 .and_then(|issue| {
                     let replies =
                         github.issue_comments(&token, &owner, &repo, number, 1, COMMENT_COUNT)?;
+                    // The header extras are optional: a failure here must not cost the member the whole conversation.
+                    let pull = (is_pull || issue.pull_request.is_some())
+                        .then(|| github.pull(&token, &owner, &repo, number).ok())
+                        .flatten()
+                        .map(|pull| PullHeader::from_pull(&pull));
                     let now = now();
                     let mut comments = vec![CommentItem::from_issue(&issue, now)];
                     comments.extend(
@@ -272,9 +306,42 @@ impl Shell {
                         title: issue.title,
                         state: issue.state,
                         comments,
+                        pull,
+                        has_more: replies.len() == COMMENT_COUNT as usize,
                     })
                 });
             Message::ConversationLoaded { reference, result }
+        });
+    }
+
+    /// Fetches one page (100 files) of the open pull request's changed files.
+    fn load_files(&mut self, page: u32, context: &ComponentContext<Guit>) {
+        let Some(conversation) = &self.conversation else {
+            return;
+        };
+        let link = &conversation.link;
+        let (token, owner, repo, number, reference) = (
+            self.token.clone(),
+            link.owner.clone(),
+            link.repo.clone(),
+            link.number,
+            link.reference(),
+        );
+        _ = context.spawn_background(move |_| {
+            let result = GitHub::new(&WinRtTransport)
+                .pull_files(&token, &owner, &repo, number, page, pulls::FILES_PER_PAGE)
+                .map(|files| (files.len(), diff::rows(&files)));
+            Message::FilesLoaded {
+                reference,
+                page,
+                result: result.map(|(count, mut rows)| {
+                    // A full page means there may be more files: say so with a marker row the view turns into a button.
+                    if count == pulls::FILES_PER_PAGE as usize {
+                        rows.push(pulls::more_files_marker());
+                    }
+                    rows
+                }),
+            }
         });
     }
 
@@ -626,6 +693,11 @@ impl Component for Guit {
                             conversation.title = loaded.title;
                             conversation.state = loaded.state;
                             conversation.comments = loaded.comments;
+                            conversation.has_more = loaded.has_more;
+                            if let Some(pull) = loaded.pull {
+                                conversation.state.clone_from(&pull.state);
+                                conversation.pull = Some(pull);
+                            }
                         }
                         Err(error) if error.is_unauthorized() => self.sign_out(),
                         Err(error) => conversation.error = Some(error.describe()),
@@ -681,6 +753,174 @@ impl Component for Guit {
                         }
                         Err(error) => conversation.error = Some(error.describe()),
                     }
+                }
+            }
+
+            (Session::SignedIn(shell), Message::LoadMoreComments) => {
+                if let Some(conversation) = shell
+                    .conversation
+                    .as_mut()
+                    .filter(|open| open.has_more && !open.loading_more)
+                {
+                    conversation.loading_more = true;
+                    let link = &conversation.link;
+                    let (token, owner, repo, number, reference) = (
+                        shell.token.clone(),
+                        link.owner.clone(),
+                        link.repo.clone(),
+                        link.number,
+                        link.reference(),
+                    );
+                    let page = conversation.page + 1;
+                    _ = context.spawn_background(move |_| {
+                        let result = GitHub::new(&WinRtTransport)
+                            .issue_comments(&token, &owner, &repo, number, page, COMMENT_COUNT)
+                            .map(|replies| {
+                                let now = now();
+                                replies
+                                    .iter()
+                                    .map(|reply| CommentItem::from_comment(reply, now))
+                                    .collect()
+                            });
+                        Message::MoreCommentsLoaded { reference, result }
+                    });
+                }
+            }
+            (Session::SignedIn(shell), Message::MoreCommentsLoaded { reference, result }) => {
+                if let Some(conversation) = shell
+                    .conversation
+                    .as_mut()
+                    .filter(|open| open.link.reference() == reference)
+                {
+                    conversation.loading_more = false;
+                    match result {
+                        Ok(comments) => {
+                            conversation.page += 1;
+                            conversation.has_more = comments.len() == COMMENT_COUNT as usize;
+                            conversation.comments.extend(comments);
+                        }
+                        Err(error) => conversation.error = Some(error.describe()),
+                    }
+                }
+            }
+            (
+                Session::SignedIn(shell),
+                Message::React {
+                    comment_id,
+                    content,
+                },
+            ) => {
+                if let Some(conversation) = &mut shell.conversation
+                    && let Some(comment) = conversation
+                        .comments
+                        .iter_mut()
+                        .find(|comment| comment.id == comment_id)
+                {
+                    // Optimistic: the count goes up at once and comes back down if GitHub refuses.
+                    comment.adjust_reaction(&content, 1);
+                    let link = &conversation.link;
+                    let (token, owner, repo, number, reference) = (
+                        shell.token.clone(),
+                        link.owner.clone(),
+                        link.repo.clone(),
+                        link.number,
+                        link.reference(),
+                    );
+                    let is_opening_post = comment.is_opening_post;
+                    _ = context.spawn_background(move |_| {
+                        let github = GitHub::new(&WinRtTransport);
+                        let result = if is_opening_post {
+                            github.react_to_issue(&token, &owner, &repo, number, &content)
+                        } else {
+                            github.react_to_comment(&token, &owner, &repo, comment_id, &content)
+                        };
+                        Message::ReactFinished {
+                            reference,
+                            comment_id,
+                            content,
+                            error: result.err().map(|error| error.describe()),
+                        }
+                    });
+                }
+            }
+            (
+                Session::SignedIn(shell),
+                Message::ReactFinished {
+                    reference,
+                    comment_id,
+                    content,
+                    error: Some(error),
+                },
+            ) => {
+                if let Some(conversation) = shell
+                    .conversation
+                    .as_mut()
+                    .filter(|open| open.link.reference() == reference)
+                {
+                    if let Some(comment) = conversation
+                        .comments
+                        .iter_mut()
+                        .find(|comment| comment.id == comment_id)
+                    {
+                        comment.adjust_reaction(&content, -1);
+                    }
+                    conversation.error = Some(error);
+                }
+            }
+            (Session::SignedIn(shell), Message::ShowFiles) => {
+                if let Some(conversation) = &mut shell.conversation {
+                    conversation.files = Some(Files::default());
+                    shell.load_files(1, context);
+                }
+            }
+            (Session::SignedIn(shell), Message::LoadMoreFiles) => {
+                let next = shell
+                    .conversation
+                    .as_mut()
+                    .and_then(|open| open.files.as_mut())
+                    .filter(|files| !files.loading)
+                    .map(|files| {
+                        files.loading = true;
+                        files.page + 1
+                    });
+                if let Some(page) = next {
+                    shell.load_files(page, context);
+                }
+            }
+            (
+                Session::SignedIn(shell),
+                Message::FilesLoaded {
+                    reference,
+                    page,
+                    result,
+                },
+            ) => {
+                if let Some(conversation) = shell
+                    .conversation
+                    .as_mut()
+                    .filter(|open| open.link.reference() == reference)
+                    && let Some(files) = &mut conversation.files
+                {
+                    files.loading = false;
+                    match result {
+                        Ok(rows) => {
+                            let mut all = (*files.rows).clone();
+                            // Drop the previous page's "more files" marker before appending.
+                            if all.last().is_some_and(pulls::is_more_files_marker) {
+                                all.pop();
+                            }
+                            all.extend(rows);
+                            files.rows = Rc::new(all);
+                            files.page = page;
+                            files.revision += 1;
+                        }
+                        Err(error) => files.error = Some(error.describe()),
+                    }
+                }
+            }
+            (Session::SignedIn(shell), Message::CloseFiles) => {
+                if let Some(conversation) = &mut shell.conversation {
+                    conversation.files = None;
                 }
             }
 

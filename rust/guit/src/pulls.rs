@@ -3,7 +3,10 @@
 
 use std::rc::Rc;
 
-use guit_core::conversation::{CommentItem, PullRequestItem, PullRequestScope};
+use guit_core::conversation::{
+    CommentItem, PullHeader, PullRequestItem, PullRequestScope, REACTIONS,
+};
+use guit_core::diff::{DiffKind, DiffRow};
 use guit_core::link::SubjectLink;
 use guit_core::rich::{Block, BlockKind};
 use windows_reactor::*;
@@ -34,7 +37,57 @@ pub struct Conversation {
     /// The reply being written.
     pub draft: String,
     pub sending: bool,
+    /// Set for a pull request: state, branches and diff size for the header.
+    pub pull: Option<PullHeader>,
+    /// Pages of comments loaded so far, and whether the last one was full.
+    pub page: u32,
+    pub has_more: bool,
+    pub loading_more: bool,
+    /// The "Files changed" view, when it is open on top of the conversation.
+    pub files: Option<Files>,
 }
+
+/// Files fetched per request (GitHub's maximum).
+pub const FILES_PER_PAGE: u32 = 100;
+
+/// The changed files of a pull request as one flat list of diff rows.
+pub struct Files {
+    pub rows: Rc<Vec<DiffRow>>,
+    pub loading: bool,
+    pub error: Option<String>,
+    pub page: u32,
+    /// Bumped whenever `rows` changes, for the virtualised list.
+    pub revision: u64,
+}
+
+impl Default for Files {
+    fn default() -> Self {
+        Self {
+            rows: Rc::new(Vec::new()),
+            loading: true,
+            error: None,
+            page: 0,
+            revision: 0,
+        }
+    }
+}
+
+/// A row that stands for "there are more files": the view shows it as a button.
+pub fn more_files_marker() -> DiffRow {
+    DiffRow {
+        kind: DiffKind::Note,
+        text: MORE_FILES.to_string(),
+        old_number: String::new(),
+        new_number: String::new(),
+        detail: String::new(),
+    }
+}
+
+pub fn is_more_files_marker(row: &DiffRow) -> bool {
+    row.kind == DiffKind::Note && row.text == MORE_FILES
+}
+
+const MORE_FILES: &str = "\u{0}more-files";
 
 impl Conversation {
     pub fn opening(link: SubjectLink) -> Self {
@@ -47,6 +100,11 @@ impl Conversation {
             error: None,
             draft: String::new(),
             sending: false,
+            pull: None,
+            page: 1,
+            has_more: false,
+            loading_more: false,
+            files: None,
         }
     }
 
@@ -157,41 +215,71 @@ fn pull_row(item: &PullRequestItem) -> View {
 }
 
 pub fn conversation_page(conversation: &Conversation, context: &ViewContext<Guit>) -> View {
+    if let Some(files) = &conversation.files {
+        return files_page(conversation, files, context);
+    }
+
+    let mut title_lines: Vec<View> = vec![
+        TextBlock::new()
+            .text(conversation.title.as_str())
+            .font_size(20.0)
+            .font_weight(FontWeight::SEMI_BOLD)
+            .text_wrapping(TextWrapping::Wrap)
+            .into(),
+        TextBlock::new()
+            .text(if conversation.state.is_empty() {
+                conversation.link.reference()
+            } else {
+                format!(
+                    "{} \u{00B7} {}",
+                    conversation.link.reference(),
+                    conversation.state
+                )
+            })
+            .font_size(12.0)
+            .opacity(0.7)
+            .into(),
+    ];
+    let mut buttons: Vec<View> = Vec::new();
+    if let Some(pull) = &conversation.pull {
+        title_lines.push(
+            TextBlock::new()
+                .text(format!("{} \u{00B7} {}", pull.branches, pull.diff_summary))
+                .font_size(12.0)
+                .opacity(0.7)
+                .into(),
+        );
+        buttons.push(
+            Button::new()
+                .content("Files changed")
+                .on_click(context.message(Message::ShowFiles))
+                .into(),
+        );
+    }
+    buttons.push(
+        Button::new()
+            .automation_name("Open on GitHub")
+            .content(FontIcon::new().glyph("\u{E8A7}").font_size(16.0))
+            .on_click(context.message(Message::OpenConversationInBrowser))
+            .into(),
+    );
+
     let header = Grid::new()
         .columns([GridLength::Auto, GridLength::STAR, GridLength::Auto])
         .column_spacing(12.0)
         .margin(Thickness::new(16.0, 16.0, 24.0, 8.0))
         .children((
-            Button::new()
-                .vertical_alignment(VerticalAlignment::Top)
-                .automation_name("Back")
-                .content(FontIcon::new().glyph("\u{E72B}").font_size(16.0))
-                .on_click(context.message(Message::CloseConversation)),
-            StackPanel::new().grid_column(1).spacing(2.0).children((
-                TextBlock::new()
-                    .text(conversation.title.as_str())
-                    .font_size(20.0)
-                    .font_weight(FontWeight::SEMI_BOLD)
-                    .text_wrapping(TextWrapping::Wrap),
-                TextBlock::new()
-                    .text(if conversation.state.is_empty() {
-                        conversation.link.reference()
-                    } else {
-                        format!(
-                            "{} \u{00B7} {}",
-                            conversation.link.reference(),
-                            conversation.state
-                        )
-                    })
-                    .font_size(12.0)
-                    .opacity(0.7),
-            )),
-            Button::new()
+            back_button(context.message(Message::CloseConversation)),
+            StackPanel::new()
+                .grid_column(1)
+                .spacing(2.0)
+                .children(title_lines),
+            StackPanel::new()
                 .grid_column(2)
+                .orientation(Orientation::Horizontal)
+                .spacing(8.0)
                 .vertical_alignment(VerticalAlignment::Top)
-                .automation_name("Open on GitHub")
-                .content(FontIcon::new().glyph("\u{E8A7}").font_size(16.0))
-                .on_click(context.message(Message::OpenConversationInBrowser)),
+                .children(buttons),
         ));
 
     // Comments are text of very different heights; the list still only realises what is on screen.
@@ -199,7 +287,7 @@ pub fn conversation_page(conversation: &Conversation, context: &ViewContext<Guit
         .selection_mode(ListViewSelectionMode::None)
         .items(conversation.comments.iter().map(|comment| {
             DataItem::new(comment.id.to_string(), comment.author.as_str())
-                .content(comment_card(comment))
+                .content(comment_card(comment, context))
         }));
 
     let mut layers: Vec<View> = vec![list.into()];
@@ -215,8 +303,22 @@ pub fn conversation_page(conversation: &Conversation, context: &ViewContext<Guit
         );
     }
 
+    let more: View = if conversation.loading_more {
+        ProgressBar::new().grid_row(2).is_indeterminate(true).into()
+    } else if conversation.has_more {
+        Button::new()
+            .grid_row(2)
+            .margin(Thickness::new(24.0, 8.0, 24.0, 0.0))
+            .horizontal_alignment(HorizontalAlignment::Center)
+            .content("Load more comments")
+            .on_click(context.message(Message::LoadMoreComments))
+            .into()
+    } else {
+        Grid::new().grid_row(2).into()
+    };
+
     let reply = Grid::new()
-        .grid_row(2)
+        .grid_row(3)
         .columns([GridLength::STAR, GridLength::Auto])
         .column_spacing(8.0)
         .margin(Thickness::new(24.0, 8.0, 24.0, 16.0))
@@ -239,17 +341,37 @@ pub fn conversation_page(conversation: &Conversation, context: &ViewContext<Guit
         ));
 
     Grid::new()
-        .rows([GridLength::Auto, GridLength::STAR, GridLength::Auto])
-        .children((header, Grid::new().grid_row(1).children(layers), reply))
+        .rows([
+            GridLength::Auto,
+            GridLength::STAR,
+            GridLength::Auto,
+            GridLength::Auto,
+        ])
+        .children((
+            header,
+            Grid::new().grid_row(1).children(layers),
+            more,
+            reply,
+        ))
         .into()
 }
 
-/// One post: who and when on the first line, then the text.
-fn comment_card(comment: &CommentItem) -> View {
+fn back_button(on_click: Callback<()>) -> Button {
+    Button::new()
+        .vertical_alignment(VerticalAlignment::Top)
+        .automation_name("Back")
+        .content(FontIcon::new().glyph("\u{E72B}").font_size(16.0))
+        .on_click(on_click)
+}
+
+/// One post: who and when on the first line, then the text, then its reactions.
+fn comment_card(comment: &CommentItem, context: &ViewContext<Guit>) -> View {
     let byline = match &comment.association {
         Some(association) => format!("{} \u{00B7} {}", association, comment.posted),
         None => comment.posted.clone(),
     };
+    let comment_id = comment.id;
+    let reactions = comment.reaction_summary();
     StackPanel::new()
         .spacing(6.0)
         .margin(Thickness::new(0.0, 8.0, 0.0, 8.0))
@@ -271,6 +393,166 @@ fn comment_card(comment: &CommentItem) -> View {
                 .paragraphs(rich_text(&comment.content))
                 .text_wrapping(TextWrapping::Wrap)
                 .is_text_selection_enabled(true),
+            StackPanel::new()
+                .orientation(Orientation::Horizontal)
+                .spacing(8.0)
+                .children((
+                    DropDownButton::new()
+                        .automation_name("Add reaction")
+                        .content(FontIcon::new().glyph("\u{E76E}").font_size(14.0))
+                        .menu(Menu::new(
+                            REACTIONS.map(|(name, emoji)| {
+                                MenuItem::item(name, format!("{emoji}  {name}"))
+                            }),
+                            context.callback(move |key: Key| Message::React {
+                                comment_id,
+                                content: key.as_str().unwrap_or_default().to_string(),
+                            }),
+                        )),
+                    TextBlock::new()
+                        .text(reactions)
+                        .vertical_alignment(VerticalAlignment::Center),
+                )),
+        ))
+        .into()
+}
+
+/// The "Files changed" view: every file and every diff line is one row of a virtualised list.
+fn files_page(conversation: &Conversation, files: &Files, context: &ViewContext<Guit>) -> View {
+    let header = Grid::new()
+        .columns([GridLength::Auto, GridLength::STAR])
+        .column_spacing(12.0)
+        .margin(Thickness::new(16.0, 16.0, 24.0, 8.0))
+        .children((
+            back_button(context.message(Message::CloseFiles)),
+            StackPanel::new().grid_column(1).spacing(2.0).children((
+                TextBlock::new()
+                    .text("Files changed")
+                    .font_size(20.0)
+                    .font_weight(FontWeight::SEMI_BOLD),
+                TextBlock::new()
+                    .text(conversation.link.reference())
+                    .font_size(12.0)
+                    .opacity(0.7),
+            )),
+        ));
+
+    let rows = Rc::clone(&files.rows);
+    let load_more = context.message(Message::LoadMoreFiles);
+    let source = VirtualSource::new(
+        files.revision,
+        rows.len(),
+        |index| index as u64,
+        move |index| diff_row(&rows[index], &load_more),
+    );
+
+    let mut layers: Vec<View> = vec![
+        ScrollViewer::new()
+            .margin(Thickness::new(12.0, 0.0, 12.0, 12.0))
+            .content(ItemsRepeater::new().virtual_source(source))
+            .into(),
+    ];
+    if files.loading {
+        layers.push(ProgressRing::new().is_active(true).into());
+    }
+    if let Some(error) = &files.error {
+        layers.push(
+            error_bar(error)
+                .vertical_alignment(VerticalAlignment::Top)
+                .margin(Thickness::new(24.0, 0.0, 24.0, 0.0))
+                .into(),
+        );
+    } else if !files.loading && files.rows.is_empty() {
+        layers.push(
+            TextBlock::new()
+                .text("No files changed")
+                .font_size(20.0)
+                .opacity(0.6)
+                .horizontal_alignment(HorizontalAlignment::Center)
+                .vertical_alignment(VerticalAlignment::Center)
+                .into(),
+        );
+    }
+
+    Grid::new()
+        .rows([GridLength::Auto, GridLength::STAR])
+        .children((header, Grid::new().grid_row(1).children(layers)))
+        .into()
+}
+
+// Diff colours are the one place the app sets a colour itself: green and red carry the meaning.
+// They are translucent so the same colour reads on light and dark backgrounds. Same values as the C# app.
+const ADDED: Color = Color::argb(0x38, 0x2E, 0xA0, 0x43);
+const REMOVED: Color = Color::argb(0x38, 0xF8, 0x51, 0x49);
+const HUNK: Color = Color::argb(0x28, 0x38, 0x8B, 0xFD);
+const FILE: Color = Color::argb(0x18, 0x80, 0x80, 0x80);
+
+fn diff_row(row: &DiffRow, load_more: &Callback<()>) -> View {
+    if is_more_files_marker(row) {
+        return Button::new()
+            .margin(Thickness::new(0.0, 12.0, 0.0, 12.0))
+            .horizontal_alignment(HorizontalAlignment::Center)
+            .content("Load more files")
+            .on_click(load_more.clone())
+            .into();
+    }
+
+    let background = match row.kind {
+        DiffKind::Added => ADDED,
+        DiffKind::Removed => REMOVED,
+        DiffKind::Hunk => HUNK,
+        DiffKind::File => FILE,
+        DiffKind::Context | DiffKind::Note => Color::transparent(),
+    };
+    let number = |text: &str, column: i32| {
+        TextBlock::new()
+            .grid_column(column)
+            .text(text)
+            .font_family("Cascadia Mono, Consolas")
+            .font_size(12.0)
+            .opacity(0.6)
+            .horizontal_alignment(HorizontalAlignment::Right)
+    };
+    Grid::new()
+        .columns([
+            GridLength::Pixel(44.0),
+            GridLength::Pixel(44.0),
+            GridLength::STAR,
+            GridLength::Auto,
+        ])
+        .column_spacing(8.0)
+        .background(background)
+        // A file heading gets room above it, so files read as separate blocks.
+        .margin(Thickness::new(
+            0.0,
+            if row.kind == DiffKind::File {
+                16.0
+            } else {
+                0.0
+            },
+            0.0,
+            0.0,
+        ))
+        .children((
+            number(&row.old_number, 0),
+            number(&row.new_number, 1),
+            TextBlock::new()
+                .grid_column(2)
+                .text(row.text.as_str())
+                .font_family("Cascadia Mono, Consolas")
+                .font_size(12.0)
+                .font_weight(if row.kind == DiffKind::File {
+                    FontWeight::SEMI_BOLD
+                } else {
+                    FontWeight::NORMAL
+                })
+                .text_wrapping(TextWrapping::Wrap)
+                .is_text_selection_enabled(true),
+            TextBlock::new()
+                .grid_column(3)
+                .text(row.detail.as_str())
+                .font_size(12.0)
+                .opacity(0.7),
         ))
         .into()
 }
