@@ -18,6 +18,9 @@
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
     <RestorePackagesWithLockFile>false</RestorePackagesWithLockFile>
     <ArtifactsPath>$(MSBuildThisFileDirectory)artifacts</ArtifactsPath>
+    <!-- .NET 11 Runtime Async: the compiler emits async methods the runtime runs natively (no state-machine classes),
+         which also works with Native AOT. Opt out with UseRuntimeAsync=false. No runtime switch is needed. -->
+    <Features>$(Features);runtime-async=on</Features>
   </PropertyGroup>
 
   <!-- AOT first: every project is analysed as if it will be trimmed and AOT compiled.
