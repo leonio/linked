@@ -267,6 +267,17 @@ pub struct JobStep {
     pub completed_at: Option<String>,
 }
 
+/// The outcome of a conditional poll of the notifications.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NotificationPoll {
+    /// The first page, or `None` when GitHub answered 304 Not Modified (which does not count against the rate limit).
+    pub threads: Option<Vec<NotificationThread>>,
+    /// The reply's `Last-Modified`, to send back as `If-Modified-Since` next time.
+    pub last_modified: Option<String>,
+    /// GitHub's `X-Poll-Interval`: how many seconds it wants between polls.
+    pub poll_interval: Option<u64>,
+}
+
 /// The GitHub client. Cheap to copy around: it only borrows the transport.
 pub struct GitHub<'a, T: Transport + ?Sized> {
     transport: &'a T,
@@ -330,6 +341,45 @@ impl<'a, T: Transport + ?Sized> GitHub<'a, T> {
             "{API}/notifications?all={all}&participating={participating}&page={page}&per_page={per_page}"
         );
         self.json(&Self::authorized(Request::get(url), token))
+    }
+
+    /// The same request as `notifications`, made conditional with `If-Modified-Since` for background refreshes.
+    pub fn poll_notifications(
+        &self,
+        token: &str,
+        all: bool,
+        participating: bool,
+        page: u32,
+        per_page: u32,
+        if_modified_since: Option<&str>,
+    ) -> Result<NotificationPoll, ApiError> {
+        let url = format!(
+            "{API}/notifications?all={all}&participating={participating}&page={page}&per_page={per_page}"
+        );
+        let mut request = Self::authorized(Request::get(url), token);
+        if let Some(date) = if_modified_since {
+            request = request.header("If-Modified-Since", date);
+        }
+
+        let response = self.transport.send(&request).map_err(ApiError::Transport)?;
+        let last_modified = response.header("last-modified").map(str::to_string);
+        let poll_interval = response
+            .header("x-poll-interval")
+            .and_then(|seconds| seconds.trim().parse().ok());
+        let threads = if response.status == 304 {
+            None
+        } else {
+            let response = Self::check(response)?;
+            Some(
+                serde_json::from_str(&response.body)
+                    .map_err(|error| ApiError::Decode(error.to_string()))?,
+            )
+        };
+        Ok(NotificationPoll {
+            threads,
+            last_modified,
+            poll_interval,
+        })
     }
 
     /// operationId: activity/mark-thread-as-read
@@ -610,7 +660,11 @@ impl<'a, T: Transport + ?Sized> GitHub<'a, T> {
     }
 
     fn send(&self, request: &Request) -> Result<Response, ApiError> {
-        let response = self.transport.send(request).map_err(ApiError::Transport)?;
+        Self::check(self.transport.send(request).map_err(ApiError::Transport)?)
+    }
+
+    /// Turns an error status into an `ApiError`.
+    fn check(response: Response) -> Result<Response, ApiError> {
         if (200..300).contains(&response.status) {
             Ok(response)
         } else {
@@ -1014,6 +1068,58 @@ mod tests {
             (reactions.plus_one, reactions.heart, reactions.rocket),
             (2, 1, 0)
         );
+    }
+
+    #[test]
+    fn a_poll_is_conditional_and_reports_304_and_the_polling_headers() {
+        let transport = Canned::new()
+            .reply_with(
+                200,
+                THREAD,
+                &[
+                    ("last-modified", "Thu, 01 Jan 2026 10:00:00 GMT"),
+                    ("x-poll-interval", "90"),
+                ],
+            )
+            .reply_with(304, "", &[("x-poll-interval", "60")])
+            .reply(401, "");
+        let github = GitHub::new(&transport);
+
+        let first = github
+            .poll_notifications("tok", false, false, 1, 50, None)
+            .unwrap();
+        let second = github
+            .poll_notifications(
+                "tok",
+                false,
+                false,
+                1,
+                50,
+                Some("Thu, 01 Jan 2026 10:00:00 GMT"),
+            )
+            .unwrap();
+        let third = github.poll_notifications("tok", false, false, 1, 50, None);
+
+        assert_eq!(first.threads.map(|threads| threads.len()), Some(1));
+        assert_eq!(
+            first.last_modified.as_deref(),
+            Some("Thu, 01 Jan 2026 10:00:00 GMT")
+        );
+        assert_eq!(first.poll_interval, Some(90));
+        assert_eq!((second.threads, second.poll_interval), (None, Some(60)));
+        assert!(third.unwrap_err().is_unauthorized());
+
+        let sent = transport.sent.borrow();
+        assert!(
+            !sent[0]
+                .headers
+                .iter()
+                .any(|(name, _)| *name == "If-Modified-Since")
+        );
+        assert!(sent[1].headers.contains(&(
+            "If-Modified-Since",
+            "Thu, 01 Jan 2026 10:00:00 GMT".to_string()
+        )));
     }
 
     #[test]

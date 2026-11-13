@@ -92,7 +92,7 @@ The same app on windows-rs and windows-reactor, to compare with the C# app. It r
 - [x] 6.4 One measuring script for both apps (`tools/measure-startup.ps1`)
 - [x] 6.5 Manually started workflow publishing versioned zips of both apps (`release.yml`)
 - [ ] 6.6 **[H]** Run the Rust app signed in on a real machine; nobody has seen its inbox yet
-- [x] 6.7 Inbox parity: paging ("Load more"), filters, kind filter, mark as done, background refresh (unconditional for now)
+- [x] 6.7 Inbox parity: paging ("Load more"), filters, kind filter, mark as done, background refresh (conditional: If-Modified-Since, X-Poll-Interval)
 - [x] 6.8 Pull requests page; conversations as plain text with a reply box (first 100 comments)
 - [x] 6.8b Formatted comments: `guit_core::rich` (a port of the C# HTML parser) drawn with reactor's rich text
 - [x] 6.8c Conversation parity, the rest: reactions, pull request header, Files changed, comment paging (by button)

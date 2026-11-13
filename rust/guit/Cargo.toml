@@ -18,6 +18,7 @@ windows = { workspace = true, features = [
     "Security_Credentials",
     "Storage_Streams",
     "System",
+    "Web_Http_Filters",
     "Web_Http_Headers",
     "combaseapi",
 ] }

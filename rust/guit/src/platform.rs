@@ -9,6 +9,9 @@ use windows::Foundation::Uri;
 use windows::Security::Credentials::{PasswordCredential, PasswordVault};
 use windows::Storage::Streams::UnicodeEncoding;
 use windows::System::Launcher;
+use windows::Web::Http::Filters::{
+    HttpBaseProtocolFilter, HttpCacheReadBehavior, HttpCacheWriteBehavior,
+};
 use windows::Web::Http::{HttpClient, HttpMethod, HttpRequestMessage, HttpStringContent};
 use windows::Win32::{CO_MTA_USAGE_COOKIE, CoIncrementMTAUsage};
 use windows::core::{HSTRING, Result, h};
@@ -35,7 +38,13 @@ impl WinRtTransport {
             return Ok(client);
         }
 
-        let client = HttpClient::new()?;
+        // The platform's HTTP cache would honour GitHub's "max-age=60" and could hand back a minute-old inbox,
+        // and it would swallow the 304s that conditional polling relies on. The app manages freshness itself.
+        let filter = HttpBaseProtocolFilter::new()?;
+        let cache = filter.CacheControl()?;
+        cache.SetReadBehavior(HttpCacheReadBehavior::NoCache)?;
+        cache.SetWriteBehavior(HttpCacheWriteBehavior::NoCache)?;
+        let client = HttpClient::Create(&filter)?;
         Ok(CLIENT.get_or_init(|| client))
     }
 
@@ -61,8 +70,16 @@ impl WinRtTransport {
         }
 
         let reply = Self::client()?.SendRequestAsync(&message)?.join()?;
+        let content = reply.Content()?;
+        // WinRT splits headers in two: Last-Modified, for one, is a content header.
         let mut reply_headers = Vec::new();
         for pair in reply.Headers()? {
+            reply_headers.push((
+                pair.Key()?.to_string_lossy().to_ascii_lowercase(),
+                pair.Value()?.to_string_lossy(),
+            ));
+        }
+        for pair in content.Headers()? {
             reply_headers.push((
                 pair.Key()?.to_string_lossy().to_ascii_lowercase(),
                 pair.Value()?.to_string_lossy(),
@@ -72,11 +89,7 @@ impl WinRtTransport {
         Ok(Response {
             status: reply.StatusCode()?.0 as u16,
             headers: reply_headers,
-            body: reply
-                .Content()?
-                .ReadAsStringAsync()?
-                .join()?
-                .to_string_lossy(),
+            body: content.ReadAsStringAsync()?.join()?.to_string_lossy(),
         })
     }
 }

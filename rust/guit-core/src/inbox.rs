@@ -180,6 +180,8 @@ pub struct Inbox {
     top_ups: u32,
     /// Bumped whenever `visible` changes, for views that cache by revision.
     revision: u64,
+    /// `Last-Modified` of the newest poll reply for the current filter; sent back as `If-Modified-Since`.
+    last_modified: Option<String>,
 }
 
 impl Inbox {
@@ -221,6 +223,8 @@ impl Inbox {
     /// Starts a full load of the first page (also used when the filter changes).
     pub fn begin_load(&mut self) -> PageRequest {
         self.generation += 1;
+        // A full load (or a filter change) makes the next poll unconditional again.
+        self.last_modified = None;
         self.loading = true;
         self.loading_more = false;
         self.top_ups = 0;
@@ -321,6 +325,18 @@ impl Inbox {
         self.all = items.into_iter().map(Rc::new).collect();
         self.rebuild();
         true
+    }
+
+    /// The `If-Modified-Since` value for the next background refresh, if there is one.
+    pub fn last_modified(&self) -> Option<&str> {
+        self.last_modified.as_deref()
+    }
+
+    /// Remembers a poll reply's `Last-Modified`. Ignored for a superseded load, or when the reply had none.
+    pub fn set_last_modified(&mut self, generation: u64, value: Option<String>) {
+        if generation == self.generation && value.is_some() {
+            self.last_modified = value;
+        }
     }
 
     /// The request a background refresh should send, or `None` while a load is running.
@@ -678,6 +694,30 @@ mod tests {
         let request = inbox.refresh_request().unwrap();
         assert!(inbox.refreshed(request.generation, read_elsewhere));
         assert!(!inbox.visible()[1].unread);
+    }
+
+    #[test]
+    fn polls_after_the_first_are_conditional_until_the_filter_changes() {
+        let mut inbox = loaded(items(1, 2, "Issue"));
+        assert_eq!(inbox.last_modified(), None);
+
+        let poll = inbox.refresh_request().unwrap();
+        inbox.set_last_modified(
+            poll.generation,
+            Some("Thu, 01 Jan 2026 10:00:00 GMT".into()),
+        );
+        assert_eq!(inbox.last_modified(), Some("Thu, 01 Jan 2026 10:00:00 GMT"));
+
+        // A reply without the header keeps the date we have; a stale reply cannot set one.
+        inbox.set_last_modified(poll.generation, None);
+        assert_eq!(inbox.last_modified(), Some("Thu, 01 Jan 2026 10:00:00 GMT"));
+
+        let reload = inbox.set_filter(Filter::All).unwrap();
+        assert_eq!(inbox.last_modified(), None);
+        inbox.set_last_modified(poll.generation, Some("stale".into()));
+        assert_eq!(inbox.last_modified(), None);
+        inbox.set_last_modified(reload.generation, Some("fresh".into()));
+        assert_eq!(inbox.last_modified(), Some("fresh"));
     }
 
     #[test]

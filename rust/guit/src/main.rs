@@ -15,7 +15,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use actions::{Actions, JobLog, RunDetail};
 use guit_core::actions::{JobRow, RunItem, log_lines};
-use guit_core::api::{ApiError, DeviceCode, GitHub, User};
+use guit_core::api::{ApiError, DeviceCode, GitHub, NotificationPoll, User};
 use guit_core::conversation::{CommentItem, PullHeader, PullRequestItem, PullRequestScope};
 use guit_core::device_flow::{DeviceFlowOutcome, wait_for_token};
 use guit_core::diff::{self, DiffRow};
@@ -26,7 +26,7 @@ use platform::WinRtTransport;
 use pulls::{Conversation, Files, Pulls};
 use windows_reactor::*;
 
-/// How often the inbox checks for changes in the background.
+/// How often the inbox checks for changes in the background, at most. GitHub may ask for longer (X-Poll-Interval).
 const POLL_PERIOD: Duration = Duration::from_secs(60);
 
 /// Why a page was fetched, so its reply goes to the right place.
@@ -34,7 +34,6 @@ const POLL_PERIOD: Duration = Duration::from_secs(60);
 enum Purpose {
     FirstPage,
     NextPage,
-    Refresh,
 }
 
 /// Everything that can happen. Messages cross threads (background work answers with one), so they own their data.
@@ -119,6 +118,11 @@ pub(crate) enum Message {
     },
     CloseFiles,
 
+    Polled {
+        generation: u64,
+        result: Result<NotificationPoll, ApiError>,
+    },
+
     // The shell.
     Navigate(Option<String>),
     Shortcut(Shortcut),
@@ -196,6 +200,8 @@ struct Shell {
     pending_done: Vec<Removed>,
     /// The background refresh. Dropping it cancels the next tick.
     poll: Option<ComponentTimer>,
+    /// The time between background refreshes: a minute, or longer if GitHub asks.
+    poll_period: Duration,
     section: Section,
     pulls: Pulls,
     /// The issue or pull request being read, shown in place of the section's page.
@@ -237,6 +243,7 @@ impl Guit {
             error: None,
             pending_done: Vec::new(),
             poll: Some(context.set_timeout(POLL_PERIOD, Message::PollTick)),
+            poll_period: POLL_PERIOD,
             section: Section::Inbox,
             pulls: Pulls::default(),
             conversation: None,
@@ -613,11 +620,51 @@ impl Component for Guit {
                 }
             }
             (Session::SignedIn(shell), Message::PollTick) => {
-                shell.poll = Some(context.set_timeout(POLL_PERIOD, Message::PollTick));
+                shell.poll = Some(context.set_timeout(shell.poll_period, Message::PollTick));
                 if let Some(request) = shell.inbox.refresh_request() {
-                    fetch(context, &shell.token, request, Purpose::Refresh);
+                    // A conditional request: when nothing changed GitHub answers 304, which is free against the rate limit.
+                    let (token, since) = (
+                        shell.token.clone(),
+                        shell.inbox.last_modified().map(str::to_string),
+                    );
+                    _ = context.spawn_background(move |_| Message::Polled {
+                        generation: request.generation,
+                        result: GitHub::new(&WinRtTransport).poll_notifications(
+                            &token,
+                            request.all,
+                            request.participating,
+                            request.page,
+                            request.per_page,
+                            since.as_deref(),
+                        ),
+                    });
                 }
             }
+            (Session::SignedIn(shell), Message::Polled { generation, result }) => match result {
+                Ok(poll) => {
+                    if let Some(seconds) = poll.poll_interval {
+                        shell.poll_period = POLL_PERIOD.max(Duration::from_secs(seconds));
+                    }
+                    shell
+                        .inbox
+                        .set_last_modified(generation, poll.last_modified);
+                    if let Some(threads) = poll.threads {
+                        let now = now();
+                        let items = threads
+                            .iter()
+                            .map(|thread| NotificationItem::from_thread(thread, now))
+                            .collect();
+                        if shell.inbox.refreshed(generation, items)
+                            && let Some(request) = shell.inbox.top_up()
+                        {
+                            fetch(context, &shell.token, request, Purpose::NextPage);
+                        }
+                    }
+                }
+                Err(error) if error.is_unauthorized() => self.sign_out(),
+                // A background refresh that fails says nothing; the next one, or a reload, will report it.
+                Err(_) => {}
+            },
             (
                 Session::SignedIn(shell),
                 Message::PageLoaded {
@@ -630,7 +677,6 @@ impl Component for Guit {
                     let applied = match purpose {
                         Purpose::FirstPage => shell.inbox.first_page_loaded(generation, items),
                         Purpose::NextPage => shell.inbox.more_loaded(generation, items),
-                        Purpose::Refresh => shell.inbox.refreshed(generation, items),
                     };
                     // With a kind filter on, keep fetching (a bounded number of pages) until the list is comfortably full.
                     if applied && let Some(request) = shell.inbox.top_up() {
@@ -639,8 +685,6 @@ impl Component for Guit {
                 }
                 // A rejected token ends the session, as in the C# app.
                 Err(error) if error.is_unauthorized() => self.sign_out(),
-                // A background refresh that fails says nothing; the next one, or a reload, will report it.
-                Err(_) if purpose == Purpose::Refresh => {}
                 Err(error) => {
                     if shell.inbox.load_failed(generation) {
                         shell.error = Some(error.describe());

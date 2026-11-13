@@ -63,7 +63,7 @@ The `publish_release` path of `release.yml` has not been exercised either.
 
 Known gaps against the C# app: reactor's rich text has no monospace, strikethrough or indent yet, so comments
 approximate them with characters; lists load more by button instead of on scroll (reactor's ListView has no
-"near the end" event); the inbox polls unconditionally. Settings and shortcuts exist; the settings item sits at the end of the main
+"near the end" event); the inbox polls with If-Modified-Since and follows X-Poll-Interval, as the C# app does. Settings and shortcuts exist; the settings item sits at the end of the main
 menu (as in the reactor gallery), not in the pane footer as in the C# app.
 
 ### Facts worth knowing
