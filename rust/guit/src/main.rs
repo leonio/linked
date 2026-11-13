@@ -8,6 +8,7 @@
 mod actions;
 mod platform;
 mod pulls;
+mod settings_page;
 
 use std::rc::Rc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -19,6 +20,7 @@ use guit_core::conversation::{CommentItem, PullHeader, PullRequestItem, PullRequ
 use guit_core::device_flow::{DeviceFlowOutcome, wait_for_token};
 use guit_core::diff::{self, DiffRow};
 use guit_core::inbox::{Filter, Inbox, Kind, NotificationItem, PageRequest, Removed};
+use guit_core::settings::{Settings, Shortcut, Theme};
 use guit_core::{GITHUB_CLIENT_ID, GITHUB_SCOPES};
 use platform::WinRtTransport;
 use pulls::{Conversation, Files, Pulls};
@@ -119,6 +121,11 @@ pub(crate) enum Message {
 
     // The shell.
     Navigate(Option<String>),
+    Shortcut(Shortcut),
+
+    // The settings page.
+    ThemeSelected(Option<usize>),
+    OpenProject,
 
     // The pull requests page.
     ScopeSelected(PullRequestScope),
@@ -161,7 +168,11 @@ enum Section {
     Inbox,
     PullRequests,
     Actions,
+    Settings,
 }
+
+/// The navigation pane's tags, in pane order (Ctrl+1, Ctrl+2, Ctrl+3 pick the first three).
+const SECTION_TAGS: [&str; 4] = ["inbox", "pulls", "actions", "settings"];
 
 /// The sign-in view's state.
 #[derive(Default)]
@@ -199,6 +210,8 @@ enum Session {
 
 pub(crate) struct Guit {
     session: Session,
+    /// Shared with the C# app through the same file, so a theme chosen in one build applies to the other.
+    settings: Settings,
 }
 
 fn now() -> i64 {
@@ -429,6 +442,54 @@ impl Shell {
     }
 }
 
+impl Shell {
+    /// What a shortcut means on the page being shown, if anything.
+    fn shortcut_message(&self, shortcut: Shortcut) -> Option<Message> {
+        let conversation = self.conversation.as_ref();
+        let run = self
+            .actions
+            .run
+            .as_ref()
+            .filter(|_| self.section == Section::Actions && conversation.is_none());
+        match shortcut {
+            // Also the way back to a section's list after opening something from it.
+            Shortcut::Section(index) => SECTION_TAGS
+                .get(index)
+                .map(|tag| Message::Navigate(Some((*tag).to_string()))),
+            // The innermost page closes first. Esc only closes pages without a text box, so typing a reply is safe.
+            Shortcut::Back | Shortcut::Escape => {
+                if conversation.is_some_and(|open| open.files.is_some()) {
+                    Some(Message::CloseFiles)
+                } else if conversation.is_some() {
+                    (shortcut == Shortcut::Back).then_some(Message::CloseConversation)
+                } else if run.is_some_and(|run| run.log.is_some()) {
+                    Some(Message::CloseLog)
+                } else if run.is_some() {
+                    Some(Message::CloseRun)
+                } else {
+                    None
+                }
+            }
+            Shortcut::Refresh => {
+                if conversation.is_some() {
+                    None
+                } else if run.is_some_and(|run| run.log.is_none()) {
+                    Some(Message::ReloadRun)
+                } else if run.is_some() {
+                    None
+                } else {
+                    match self.section {
+                        Section::Inbox => Some(Message::Reload),
+                        Section::PullRequests => Some(Message::ReloadPulls),
+                        Section::Actions => Some(Message::ReloadRuns),
+                        Section::Settings => None,
+                    }
+                }
+            }
+        }
+    }
+}
+
 impl Component for Guit {
     type Input = ();
     type Message = Message;
@@ -436,6 +497,7 @@ impl Component for Guit {
     fn create(_input: &(), context: &ComponentContext<Self>) -> Self {
         let mut app = Self {
             session: Session::SignedOut(SignIn::default()),
+            settings: Settings::parse(platform::load_settings().as_deref()),
         };
         if let Some(token) = platform::load_token() {
             app.enter_shell(token, context);
@@ -639,6 +701,7 @@ impl Component for Guit {
                 shell.section = match tag.as_deref() {
                     Some("pulls") => Section::PullRequests,
                     Some("actions") => Section::Actions,
+                    Some("settings") => Section::Settings,
                     _ => Section::Inbox,
                 };
                 if shell.section == Section::PullRequests && !shell.pulls.loaded {
@@ -924,6 +987,26 @@ impl Component for Guit {
                 }
             }
 
+            // ---- settings and shortcuts --------------------------------------------------------
+            (Session::SignedIn(_), Message::ThemeSelected(Some(index))) => {
+                if let Some(theme) = Theme::ALL
+                    .get(index)
+                    .copied()
+                    .filter(|theme| *theme != self.settings.theme())
+                {
+                    self.settings.set_theme(theme);
+                    platform::save_settings(&self.settings.to_json());
+                }
+            }
+            (Session::SignedIn(_), Message::OpenProject) => {
+                platform::open_in_browser("https://github.com/leonio/linked")
+            }
+            (Session::SignedIn(shell), Message::Shortcut(shortcut)) => {
+                if let Some(message) = shell.shortcut_message(shortcut) {
+                    self.update(message, context);
+                }
+            }
+
             // ---- Actions ------------------------------------------------------------------------
             (Session::SignedIn(shell), Message::RepositoriesLoaded(result)) => match result {
                 Ok(repositories) => {
@@ -1138,10 +1221,19 @@ impl Component for Guit {
     }
 
     fn view(&self, _input: &(), context: &mut ViewContext<Self>) -> View {
-        context.window_visuals(WindowVisuals::new().backdrop(WindowBackdrop::Mica));
+        let theme = match self.settings.theme() {
+            Theme::System => WindowTheme::System,
+            Theme::Light => WindowTheme::Light,
+            Theme::Dark => WindowTheme::Dark,
+        };
+        context.window_visuals(
+            WindowVisuals::new()
+                .backdrop(WindowBackdrop::Mica)
+                .theme(theme),
+        );
         let content = match &self.session {
             Session::SignedOut(sign_in) => sign_in_view(sign_in, context),
-            Session::SignedIn(shell) => shell_view(shell, context),
+            Session::SignedIn(shell) => shell_view(shell, self.settings.theme(), context),
         };
         context.window_frame("Guit", content)
     }
@@ -1212,15 +1304,45 @@ fn sign_in_view(sign_in: &SignIn, context: &ViewContext<Guit>) -> View {
         .into()
 }
 
-fn shell_view(shell: &Shell, context: &ViewContext<Guit>) -> View {
+fn shell_view(shell: &Shell, theme: Theme, context: &ViewContext<Guit>) -> View {
     let page = match (&shell.conversation, shell.section) {
         (Some(conversation), _) => pulls::conversation_page(conversation, context),
         (None, Section::Inbox) => inbox_page(shell, context),
         (None, Section::PullRequests) => pulls::pulls_page(&shell.pulls, context),
         (None, Section::Actions) => actions::page(&shell.actions, context),
+        (None, Section::Settings) => settings_page::page(theme, &shell.login, context),
     };
 
-    NavigationView::new()
+    // Shortcuts are caught on the way down (preview), before any control sees the key. Only keys that mean a
+    // shortcut on this page are marked handled; everything else reaches the focused control untouched.
+    let on_shortcut = context.callback(Message::Shortcut);
+    let handles: Vec<Shortcut> = [
+        Shortcut::Section(0),
+        Shortcut::Section(1),
+        Shortcut::Section(2),
+        Shortcut::Back,
+        Shortcut::Escape,
+        Shortcut::Refresh,
+    ]
+    .into_iter()
+    .filter(|shortcut| shell.shortcut_message(*shortcut).is_some())
+    .collect();
+    let on_key = RoutedCallback::new(move |info: KeyEventInfo| {
+        let shortcut = Shortcut::from_key(
+            info.key.0,
+            info.modifiers.contains(InputModifiers::CONTROL),
+            info.modifiers.contains(InputModifiers::ALT),
+        );
+        match shortcut.filter(|shortcut| handles.contains(shortcut)) {
+            Some(shortcut) => {
+                on_shortcut.call(shortcut);
+                true
+            }
+            None => false,
+        }
+    });
+
+    let navigation = NavigationView::new()
         .pane_display_mode(NavigationViewPaneDisplayMode::LeftCompact)
         .is_back_button_visible(NavigationViewBackButtonVisible::Collapsed)
         .is_settings_visible(false)
@@ -1240,12 +1362,21 @@ fn shell_view(shell: &Shell, context: &ViewContext<Guit>) -> View {
                 .content("Actions")
                 .icon(Symbol::Play)
                 .is_selected(shell.section == Section::Actions),
+            NavigationViewItem::new()
+                .tag("settings")
+                .content("Settings")
+                .icon(Symbol::Setting)
+                .is_selected(shell.section == Section::Settings),
         ))
         .on_selected_tag_changed(
             context
                 .callback(|tag: Option<Rc<str>>| Message::Navigate(tag.map(|tag| tag.to_string()))),
         )
-        .content(page)
+        .content(page);
+
+    Border::new()
+        .on_preview_key_down(on_key)
+        .content(navigation)
         .into()
 }
 

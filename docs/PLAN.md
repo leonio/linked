@@ -96,7 +96,7 @@ The same app on windows-rs and windows-reactor, to compare with the C# app. It r
 - [x] 6.8 Pull requests page; conversations as plain text with a reply box (first 100 comments)
 - [x] 6.8b Formatted comments: `guit_core::rich` (a port of the C# HTML parser) drawn with reactor's rich text
 - [x] 6.8c Conversation parity, the rest: reactions, pull request header, Files changed, comment paging (by button)
-- [ ] 6.11 Rust settings page (theme, account, about) and keyboard shortcuts
+- [x] 6.11 Rust settings page (theme, account, about; theme shared with the C# app through its settings file) and keyboard shortcuts (Ctrl+1..3, F5, Alt+Left, Esc)
 - [x] 6.9 Actions pages: runs per repository, jobs with steps, self-updating while live, re-run, job log
 - [ ] 6.10 **[S]** Measure the signed-in scenarios on one machine: time to a filled inbox, memory, scrolling
 

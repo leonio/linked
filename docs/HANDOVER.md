@@ -63,7 +63,8 @@ The `publish_release` path of `release.yml` has not been exercised either.
 
 Known gaps against the C# app: reactor's rich text has no monospace, strikethrough or indent yet, so comments
 approximate them with characters; lists load more by button instead of on scroll (reactor's ListView has no
-"near the end" event); the inbox polls unconditionally; there is no settings page and no keyboard shortcuts.
+"near the end" event); the inbox polls unconditionally. Settings and shortcuts exist; the settings item sits at the end of the main
+menu (as in the reactor gallery), not in the pane footer as in the C# app.
 
 ### Facts worth knowing
 
@@ -85,7 +86,7 @@ approximate them with characters; lists load more by button instead of on scroll
 
 ### Next steps
 
-Plan cards 6.6, 6.10 and 6.11 in `docs/PLAN.md`: get the owner to try the Rust app signed in and fix what that
+Plan cards 6.6 and 6.10 in `docs/PLAN.md`: get the owner to try the Rust app signed in and fix what that
 shows; then measure the signed-in scenarios on one machine. Add a `rust` skill under `.claude/skills/` once a second
 page has proven the patterns. Repeat the ARM64 measurement: C# start-up there varied from 153 to 416 ms in one run.
 

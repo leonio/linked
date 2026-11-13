@@ -135,3 +135,27 @@ pub fn copy_to_clipboard(text: &str) {
         Clipboard::SetContent(&package)
     })();
 }
+
+/// The settings file the C# app also uses: `%LOCALAPPDATA%\Guit\settings.json`.
+fn settings_path() -> Option<std::path::PathBuf> {
+    Some(
+        std::path::PathBuf::from(std::env::var_os("LOCALAPPDATA")?)
+            .join("Guit")
+            .join("settings.json"),
+    )
+}
+
+/// The settings file's text, if there is one.
+pub fn load_settings() -> Option<String> {
+    std::fs::read_to_string(settings_path()?).ok()
+}
+
+/// Writes the settings file. Failures are ignored: the setting still applies for this run.
+pub fn save_settings(json: &str) {
+    if let Some(path) = settings_path() {
+        if let Some(folder) = path.parent() {
+            _ = std::fs::create_dir_all(folder);
+        }
+        _ = std::fs::write(path, json);
+    }
+}
