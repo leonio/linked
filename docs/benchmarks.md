@@ -59,6 +59,46 @@ How to read this:
   More features mean more code to load, so expect the C# start-up figure to be the more "finished" one.
   Only the signed-out start is comparable today.
 
+### Second run: Runtime Async on (13 November 2026)
+
+The same workflow and method, run 43465880631 at commit `415fe08`, which has .NET 11 Runtime Async switched on for
+the C# app (`<Features>runtime-async=on</Features>`). Both apps again start signed out, measured one after the other on
+the same runner.
+
+| Runner | App | Start-up median (min-max) | Working set | Executable | App folder |
+|---|---|---|---|---|---|
+| x64 | C# (.NET 11 Native AOT, WinUI 3) | 158 ms (150-162) | 77 MB | 13.9 MB | 132.8 MB |
+| x64 | Rust (windows-reactor) | 124 ms (121-132) | 67 MB | 2.4 MB | 60.4 MB |
+| ARM64 | C# | 167 ms (153-173) | 85 MB | 14.1 MB | 141.5 MB |
+| ARM64 | Rust | 138 ms (138-140) | 76 MB | 2.3 MB | 67.7 MB |
+
+Against the first run (11 November):
+
+| | C# x64 | C# ARM64 | Rust x64 | Rust ARM64 |
+|---|---|---|---|---|
+| Start-up median | 160 -> 158 ms | 339 -> 167 ms | 139 -> 124 ms | 143 -> 138 ms |
+| Working set | 77 -> 77 MB | 85 -> 85 MB | 66 -> 67 MB | 77 -> 76 MB |
+| Executable | 13.9 -> 13.9 MB | 14.1 -> 14.1 MB | 1.9 -> 2.4 MB | 1.9 -> 2.3 MB |
+
+How to read this:
+
+- **Runtime Async made no measurable difference to the C# app at the sign-in view.** Working set and executable size
+  are unchanged to the decimal, and x64 start-up moved by 2 ms. That is what you would expect: this view has almost no
+  async work in it. The feature should matter once there are lists loading, which this test does not reach.
+  It also means the earlier numbers were not held back by async state machines.
+- **The big ARM64 C# change (339 -> 167 ms) is not credited to Runtime Async.** The 11 November runs were erratic
+  (153-416 ms) and these are tight (153-173 ms). The most likely explanation is the runner, not the code; two runs
+  cannot separate the two. The discarded first run was 1232 ms here, so cold starts on ARM64 are still slow.
+- **Rust is faster to start on both architectures, by about 30 ms (17-22%).** Inside this run the ranges do not
+  overlap (x64 121-132 against 150-162 ms; ARM64 138-140 against 153-173 ms). Across the two runs the gap has been
+  21 ms and 34 ms on x64, so "faster by 20-35 ms" is the fair summary, no longer "about the same".
+- **Memory is the same story as before**: Rust holds about 10 MB less (67 against 77 MB on x64; 76 against 85 MB on
+  ARM64). Most of both is the Windows App Runtime and UI framework each app loads.
+- **The Rust executable grew from 1.9 to 2.4 MB** between the two runs. The Rust app is not the same code as on
+  11 November, so the Rust rows are not a before/after of anything but time.
+- **Still one run on shared virtual machines** (about 20% run-to-run variation), and still not like for like: the C# app
+  has far more features.
+
 ## Measuring signed in
 
 CI cannot sign in, so the comparison that matters most has to run on a person's machine. Both builds write the
@@ -78,5 +118,6 @@ by more than either app's own cost, so run both apps alternately a few times and
 - **Anything after sign-in**: time to a filled inbox, memory with a few hundred notifications loaded, scrolling
   frame times. CI cannot sign in. These need a Windows machine, a signed-in account and Windows Performance Recorder.
 - **A laptop**: the budget in the `performance` skill (under 400 ms) was written for one; only CI machines have been timed.
+- **Runtime Async where it should matter**: a signed-in inbox with lists loading and scrolling. The sign-in view has almost no async work, so the second run above says nothing about it.
 - **The signed-in comparison**: both apps showing the same inbox on the same machine (plan card 6.10).
 - **CsWinRT 3**: expected to cut size and start-up further; it was still a preview when this was written (card 5.7b).

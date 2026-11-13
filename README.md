@@ -109,13 +109,15 @@ signed out, so this is each app's shell and sign-in view.
 
 | Runner | App | Start-up (median) | Memory (working set) | Executable | App folder |
 |---|---|---|---|---|---|
-| x64 | C# | 160 ms | 77 MB | 13.9 MB | 132.8 MB |
-| x64 | Rust | 139 ms | 66 MB | 1.9 MB | 60.0 MB |
-| ARM64 | C# | 339 ms (erratic) | 85 MB | 14.1 MB | 141.5 MB |
-| ARM64 | Rust | 143 ms | 77 MB | 1.9 MB | 67.3 MB |
+| x64 | C# | 158 ms | 77 MB | 13.9 MB | 132.8 MB |
+| x64 | Rust | 124 ms | 67 MB | 2.4 MB | 60.4 MB |
+| ARM64 | C# | 167 ms | 85 MB | 14.1 MB | 141.5 MB |
+| ARM64 | Rust | 138 ms | 76 MB | 2.3 MB | 67.7 MB |
 
-**Memory:** at the sign-in view the Rust app's working set is about **10 MB lower** (66 vs 77 MB on x64, 77 vs 85 MB
-on ARM64), roughly 10-14%. Most of what both apps hold is the Windows App Runtime and UI framework they each load, which
+(Run of 13 November 2026 with .NET 11 Runtime Async on.)
+
+**Memory:** at the sign-in view the Rust app's working set is about **10 MB lower** (67 vs 77 MB on x64, 76 vs 85 MB
+on ARM64), roughly 10-13%. Most of what both apps hold is the Windows App Runtime and UI framework they each load, which
 is why the gap is small next to the 7x difference in executable size. Treat it as a first indication, not a result:
 
 - it is one run per runner, on shared virtual machines that vary by about 20% between runs;
@@ -126,9 +128,10 @@ Memory with a signed-in inbox, a few hundred notifications loaded and under scro
 cannot sign in. `tools/measure-inbox.ps1` does that on a person's machine and reports launch to inbox, launch to window
 and the working set with the inbox loaded.
 
-Other first findings: start-up on x64 is about the same (Rust about 13% faster, inside the run-to-run variation); on
-ARM64 the C# app's start-up was erratic (153-416 ms) while Rust stayed at 138-153 ms, which is the first thing to repeat;
-and the clear difference is size, with the Rust executable at 1.9 MB against 13.9 MB.
+Other first findings: Rust starts about 30 ms (17-22%) faster on both architectures, and the ranges in the latest run do not
+overlap; the clearest difference is size, with the Rust executable at 2.4 MB against 13.9 MB. Switching on .NET 11 Runtime
+Async changed nothing measurable in the C# app at this view (same memory and size, start-up within 2 ms on x64), which is
+expected for a screen with almost no async work. Only anything signed in is still to be measured.
 
 ## Working in this repository
 
