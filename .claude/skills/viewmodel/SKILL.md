@@ -1,13 +1,13 @@
 ---
 name: viewmodel
-description: Rules and templates for view models, item models and services in src/Guit.Core (CommunityToolkit.Mvvm source generators, async commands, collections, fakes, tests). Load whenever a task touches Guit.Core.
+description: Rules and templates for view models, item models and services in dotnet/src/Guit.Core (CommunityToolkit.Mvvm source generators, async commands, collections, fakes, tests). Load whenever a task touches Guit.Core.
 ---
 
 # View models (Guit.Core)
 
 Worked examples to copy: `ViewModels/InboxViewModel.cs` (the full list pattern: load, paging, filter, row actions, refresh),
 `ViewModels/SignInViewModel.cs`, `ViewModels/ShellViewModel.cs`, `Services/Session.cs`,
-and their tests in `tests/Guit.Core.Tests/`.
+and their tests in `dotnet/tests/Guit.Core.Tests/`.
 
 Guit.Core must not reference WinUI. No `Microsoft.UI.*`, no `Windows.*`, no `DispatcherQueue`, no `Visibility`,
 no `BitmapImage`, no colours or brushes. If a view model needs something only Windows can do (open a browser,
@@ -111,13 +111,13 @@ public sealed partial class InboxViewModel(INotificationsApi notifications) : Ob
 
 ## Tests
 
-File: `tests/Guit.Core.Tests/<Name>ViewModelTests.cs`.
+File: `dotnet/tests/Guit.Core.Tests/<Name>ViewModelTests.cs`.
 
-- Fakes are hand-written classes in `tests/Guit.Core.Tests/Fakes.cs`, one per interface, reused by every test. Add the new interface's fake there. No mocking library.
+- Fakes are hand-written classes in `dotnet/tests/Guit.Core.Tests/Fakes.cs`, one per interface, reused by every test. Add the new interface's fake there. No mocking library.
 - Run commands with `await viewModel.LoadCommand.ExecuteAsync(null);`.
 - A fake simulates a failed call with `Task.FromException<T>(Failure.Status(HttpStatusCode.NotFound))` (`Failure` is in `Fakes.cs`).
 - Minimum tests per view model: success path fills the state; API failure sets `ErrorMessage` and leaves `IsLoading` false; each command that changes state.
-- Then add a `Check(...)` for the view model to `tests/Guit.AotSmoke/Program.cs`.
+- Then add a `Check(...)` for the view model to `dotnet/tests/Guit.AotSmoke/Program.cs`.
 
 ## Done when
 

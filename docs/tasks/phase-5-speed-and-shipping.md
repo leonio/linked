@@ -58,7 +58,7 @@ it is what CI launches and what performance is measured on.
 ## 5.7 [S] .NET 11 and CsWinRT 3
 
 When .NET 11 and CsWinRT 3.0 are both stable and the Windows App SDK supports them: change `GuitNetVersion` in
-`Directory.Build.props`, update `global.json`, update packages. Report exe size, start-up median and working set
+`dotnet/Directory.Build.props`, update `dotnet/global.json`, update packages. Report exe size, start-up median and working set
 before and after. CsWinRT 3 was rebuilt around AOT, so this is expected to be the single largest free improvement;
 it is also a breaking change (new TFM revision, span-based projections), so read its migration notes first.
 

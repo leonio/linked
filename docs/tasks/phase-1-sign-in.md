@@ -1,8 +1,8 @@
 # Phase 1 - Sign in
 
-Cards 1.1-1.3 and 1.6 are done: `src/Guit.Api/Auth/`, `src/Guit.Core/Services/Session.cs`,
-`src/Guit.Core/ViewModels/SignInViewModel.cs`, `src/Guit.App/Views/SignInView.xaml`,
-`src/Guit.App/Services/`.
+Cards 1.1-1.3 and 1.6 are done: `dotnet/src/Guit.Api/Auth/`, `dotnet/src/Guit.Core/Services/Session.cs`,
+`dotnet/src/Guit.Core/ViewModels/SignInViewModel.cs`, `dotnet/src/Guit.App/Views/SignInView.xaml`,
+`dotnet/src/Guit.App/Services/`.
 
 How sign-in works (GitHub device flow, no client secret):
 
@@ -20,7 +20,7 @@ How sign-in works (GitHub device flow, no client secret):
 1. GitHub -> Settings -> Developer settings -> OAuth Apps -> New OAuth App.
    Name: `Guit (dev)`. Homepage URL: the repository URL. Callback URL: `http://127.0.0.1` (unused by the device flow, but required).
 2. On the app's page tick **Enable Device Flow** and save. Copy the **Client ID**. Do not create a client secret.
-3. Done: the client id is set in `src/Guit.App/AppConfig.cs`. The `GUIT_GITHUB_CLIENT_ID` environment variable
+3. Done: the client id is set in `dotnet/src/Guit.App/AppConfig.cs`. The `GUIT_GITHUB_CLIENT_ID` environment variable
    overrides it. A client id is public; committing it is fine.
 4. `dotnet publish src/Guit.App -c Release -r win-x64 -p:Platform=x64`, run `artifacts\publish\Guit.App\release_win-x64\Guit.exe`.
 5. Check and write the results into the pull request or an issue:
@@ -63,5 +63,5 @@ Add a smoke `Check`: a canned 401 on one path signs the session out.
 
 ## 1.6 Friendly error messages (done)
 
-`src/Guit.Core/Services/ApiErrors.cs`: `ApiErrors.Describe(exception)` maps a failed call to a sentence.
+`dotnet/src/Guit.Core/Services/ApiErrors.cs`: `ApiErrors.Describe(exception)` maps a failed call to a sentence.
 View models catch `Refit.ApiExceptionBase` and call it. See the `viewmodel` skill.

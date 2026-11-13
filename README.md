@@ -17,6 +17,7 @@ The roadmap is [docs/PLAN.md](docs/PLAN.md).
 ## Build
 
 ```bash
+cd dotnet
 dotnet test --project tests/Guit.Api.Tests
 dotnet test --project tests/Guit.Core.Tests
 ```
@@ -24,10 +25,11 @@ dotnet test --project tests/Guit.Core.Tests
 On Windows:
 
 ```bash
+cd dotnet
 dotnet publish src/Guit.App -c Release -r win-x64 -p:Platform=x64
 ```
 
-Then run `artifacts\publish\Guit.App\release_win-x64\Guit.exe`. Set a GitHub OAuth App client id first
+Then run `dotnet\artifacts\publish\Guit.App\release_win-x64\Guit.exe`. Set a GitHub OAuth App client id first
 (card 1.4 explains how).
 
 ## Working in this repository

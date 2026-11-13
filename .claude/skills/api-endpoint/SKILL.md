@@ -1,11 +1,11 @@
 ---
 name: api-endpoint
-description: Step-by-step recipe for adding or changing a GitHub REST endpoint in src/Guit.Api (Refit interface method, DTO records, JSON context entry, DI registration, tests). Load whenever a task touches Guit.Api.
+description: Step-by-step recipe for adding or changing a GitHub REST endpoint in dotnet/src/Guit.Api (Refit interface method, DTO records, JSON context entry, DI registration, tests). Load whenever a task touches Guit.Api.
 ---
 
 # Adding a GitHub endpoint
 
-Worked example to copy: `src/Guit.Api/Notifications/` and `tests/Guit.Api.Tests/NotificationsApiTests.cs`.
+Worked example to copy: `dotnet/src/Guit.Api/Notifications/` and `dotnet/tests/Guit.Api.Tests/NotificationsApiTests.cs`.
 Do the steps in order. Do not skip step 1: never write a DTO from memory.
 
 ## 1. Look the operation up
@@ -20,7 +20,7 @@ Write down: method, path, each parameter (path/query, required or not), the 2xx 
 
 ## 2. DTO records
 
-File: `src/Guit.Api/<Area>/<Name>.cs`. One area folder per OpenAPI tag (Users, Notifications, Issues, Pulls, Actions...).
+File: `dotnet/src/Guit.Api/<Area>/<Name>.cs`. One area folder per OpenAPI tag (Users, Notifications, Issues, Pulls, Actions...).
 
 ```csharp
 /// <summary>Schema: thread.</summary>
@@ -55,7 +55,7 @@ Rules:
 
 ## 3. Refit method
 
-File: `src/Guit.Api/<Area>/I<Area>Api.cs`.
+File: `dotnet/src/Guit.Api/<Area>/I<Area>Api.cs`.
 
 ```csharp
 /// <summary>OpenAPI tag: activity (notifications).</summary>
@@ -87,7 +87,7 @@ Rules:
 
 ## 4. JSON context
 
-`src/Guit.Api/GitHubJsonContext.cs`: add one line under the right `// Area` comment for each **top-level** type a method sends or returns. Nested records are found automatically.
+`dotnet/src/Guit.Api/GitHubJsonContext.cs`: add one line under the right `// Area` comment for each **top-level** type a method sends or returns. Nested records are found automatically.
 
 ```csharp
 // Notifications
@@ -98,7 +98,7 @@ Forget this and everything compiles, then throws `NotSupportedException` at run 
 
 ## 5. DI registration (new interface only)
 
-`src/Guit.Api/GuitApiServiceCollectionExtensions.cs`, in the sorted block:
+`dotnet/src/Guit.Api/GuitApiServiceCollectionExtensions.cs`, in the sorted block:
 
 ```csharp
 services.AddGitHubApi<INotificationsApi>(primaryHandler);
@@ -106,7 +106,7 @@ services.AddGitHubApi<INotificationsApi>(primaryHandler);
 
 ## 6. Tests
 
-File: `tests/Guit.Api.Tests/<Area>ApiTests.cs`. One test per method, minimum.
+File: `dotnet/tests/Guit.Api.Tests/<Area>ApiTests.cs`. One test per method, minimum.
 
 ```csharp
 [Test]
@@ -130,7 +130,7 @@ public async Task List_sends_the_query_and_maps_nested_objects()
 
 ## 7. AOT smoke
 
-`tests/Guit.AotSmoke/Program.cs`: add a canned reply for the path in `CannedHandler` and a `Check(...)` that calls the method through DI. Then run the three commands in the `aot-rules` skill.
+`dotnet/tests/Guit.AotSmoke/Program.cs`: add a canned reply for the path in `CannedHandler` and a `Check(...)` that calls the method through DI. Then run the three commands in the `aot-rules` skill.
 
 ## Done when
 

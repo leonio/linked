@@ -21,11 +21,11 @@ Guit.App    Views/ConversationPage.xaml, Views/PullRequestsPage.xaml       3.4, 
 ## 3.1 Issues API: get issue, list comments
 
 **Layer** Api - **Skills** `api-endpoint`, `aot-rules` - **Depends on** nothing
-**Copy** `src/Guit.Api/Notifications/`.
+**Copy** `dotnet/src/Guit.Api/Notifications/`.
 
 Look up: `python3 tools/ghapi.py op issues/get` and `python3 tools/ghapi.py op issues/list-comments`.
 
-**Build** `src/Guit.Api/Issues/`
+**Build** `dotnet/src/Guit.Api/Issues/`
 - `IIssuesApi.GetAsync(string owner, string repo, int issueNumber, CancellationToken)` -> `Issue`
   on `[Get("/repos/{owner}/{repo}/issues/{issueNumber}")]`
 - `IIssuesApi.ListCommentsAsync(string owner, string repo, int issueNumber, int page, [AliasAs("per_page")] int perPage, CancellationToken)` -> `IssueComment[]`

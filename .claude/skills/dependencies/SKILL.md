@@ -22,7 +22,7 @@ No small utility packages. If something is under ~100 lines, write it.
 | `Refit.Testing` | `StubHttp` | tests |
 | `System.Text.Json` (in the framework) | JSON with source generation | Guit.Api |
 
-Pre-approved if a task needs them (add the version to `Directory.Packages.props` first):
+Pre-approved if a task needs them (add the version to `dotnet/Directory.Packages.props` first):
 `CommunityToolkit.WinUI.*` packages from the Windows Community Toolkit (controls, collections, animations, helpers),
 `Microsoft.Extensions.Http.Resilience`, `Microsoft.Extensions.Logging` (with `[LoggerMessage]` source generation only).
 
@@ -43,9 +43,9 @@ Stop and report instead of adding it, unless the task card names the package. Th
 
 ## Mechanics
 
-- Versions go only in `Directory.Packages.props` (`<PackageVersion Include="X" Version="1.2.3" />`).
+- Versions go only in `dotnet/Directory.Packages.props` (`<PackageVersion Include="X" Version="1.2.3" />`).
   The csproj has `<PackageReference Include="X" />` with **no version**.
 - Latest stable version at the time of adding. Check: `https://api.nuget.org/v3-flatcontainer/<lowercase-id>/index.json`.
   No preview/rc packages unless the task card says so.
-- The target framework is set once in `Directory.Build.props` (`GuitNetVersion`). Never write `net11.0` in a csproj.
+- The target framework is set once in `dotnet/Directory.Build.props` (`GuitNetVersion`). Never write `net11.0` in a csproj.
 - After any package change run the full verification in `aot-rules`: a package can compile and still break AOT.

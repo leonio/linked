@@ -18,7 +18,7 @@ description: How to pick up, implement, verify and hand over one task card from 
 - Do exactly the card. Things you notice outside it go in your final report, not in the diff.
 - Copy the nearest existing example (the card names it). Same file layout, same naming, same test style.
 - Do not rename, move or reformat files the card does not mention.
-- Do not edit `Directory.Build.props`, `Directory.Packages.props`, `global.json`, `.editorconfig`, the AOT block in
+- Do not edit `dotnet/Directory.Build.props`, `dotnet/Directory.Packages.props`, `dotnet/global.json`, `.editorconfig`, the AOT block in
   `Guit.App.csproj`, or `.github/` unless the card says so.
 - Layer order for a feature: Api (endpoint + test) -> Core (view model + test) -> AotSmoke -> App (XAML).
   Get each layer green before starting the next.
@@ -26,6 +26,7 @@ description: How to pick up, implement, verify and hand over one task card from 
 ## Verify (all of it, every time)
 
 ```bash
+cd dotnet
 dotnet test --project tests/Guit.Api.Tests
 dotnet test --project tests/Guit.Core.Tests
 dotnet publish tests/Guit.AotSmoke -c Release -r linux-x64
@@ -35,11 +36,12 @@ dotnet publish tests/Guit.AotSmoke -c Release -r linux-x64
 On Windows also:
 
 ```bash
+cd dotnet
 dotnet build src/Guit.App -c Release -p:Platform=x64
 ```
 
 Zero warnings, all tests pass, smoke prints `AOT smoke: all checks passed`.
-If you changed `src/Guit.App` and are not on Windows, you have not verified it: push and read the CI result,
+If you changed `dotnet/src/Guit.App` and are not on Windows, you have not verified it: push and read the CI result,
 or say plainly that the XAML is unverified.
 
 ## Finish

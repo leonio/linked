@@ -50,8 +50,9 @@ jobs:
       # ---- C#: Native AOT, self-contained Windows App SDK ----
       - uses: actions/setup-dotnet@v4
         with:
-          global-json-file: global.json
+          global-json-file: dotnet/global.json
       - name: Publish the C# app
+        working-directory: dotnet
         run: dotnet publish src/Guit.App -c Release -r ${{ matrix.rid }} -p:Platform=${{ matrix.platform }} -p:Version=${{ inputs.version }}
 
       # ---- Rust: windows-reactor, self-contained Windows App Runtime ----
@@ -82,7 +83,7 @@ jobs:
 
           # C#: the publish folder without debug symbols.
           $cs = "stage/guit-cs-$version-$rid"
-          $publish = Get-ChildItem artifacts/publish/Guit.App -Directory | Select-Object -First 1
+          $publish = Get-ChildItem dotnet/artifacts/publish/Guit.App -Directory | Select-Object -First 1
           New-Item -ItemType Directory -Force -Path $cs | Out-Null
           Copy-Item (Join-Path $publish.FullName '*') $cs -Recurse -Exclude '*.pdb'
 

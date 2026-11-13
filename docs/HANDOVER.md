@@ -34,7 +34,7 @@ the settings page, Ctrl+1..3 and Esc shortcuts, step rows and the job log page, 
 and the inbox kind filter. The owner then said "it all works locally", which probably covers these, but it was not itemised.
 
 How to work on it: `CLAUDE.md` maps each layer to a skill in `.claude/skills/`; those skills contain the
-rules and the compiler traps already hit. Without Windows you cannot build `src/Guit.App`; push and read CI.
+rules and the compiler traps already hit. Without Windows you cannot build `dotnet/src/Guit.App`; push and read CI.
 
 ## The Rust app: builds, launches and is measured; nobody has used it signed in
 

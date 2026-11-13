@@ -1,6 +1,6 @@
 ---
 name: winui-xaml
-description: Rules, templates and known compiler traps for XAML and code-behind in src/Guit.App (WinUI 3, x:Bind only, Fluent design resources, lists, navigation, AOT-safe patterns). Load whenever a task touches Guit.App.
+description: Rules, templates and known compiler traps for XAML and code-behind in dotnet/src/Guit.App (WinUI 3, x:Bind only, Fluent design resources, lists, navigation, AOT-safe patterns). Load whenever a task touches Guit.App.
 ---
 
 # WinUI XAML (Guit.App)

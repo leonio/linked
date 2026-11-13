@@ -66,7 +66,7 @@ several runs show room; never raise one to make a change pass without saying so 
 
 ## AOT publish settings
 
-They live in `src/Guit.App/Guit.App.csproj` under the "Native AOT" comment. Do not change them as part of
+They live in `dotnet/src/Guit.App/Guit.App.csproj` under the "Native AOT" comment. Do not change them as part of
 another task. A change needs before/after numbers for exe size and start-up time in the commit message.
 
 ## Measure
@@ -74,8 +74,8 @@ another task. A change needs before/after numbers for exe size and start-up time
 - **Size and working set**: push the branch; read the CI job summary of the "WinUI app" job.
 - **Start-up time** (on Windows, Release AOT publish):
   ```powershell
-  dotnet publish src/Guit.App -c Release -r win-x64 -p:Platform=x64
-  1..5 | % { $t = [Diagnostics.Stopwatch]::StartNew(); $p = Start-Process artifacts\publish\Guit.App\release_win-x64\Guit.exe -PassThru; while ($p.MainWindowHandle -eq 0) { Start-Sleep -Milliseconds 5; $p.Refresh() }; $t.ElapsedMilliseconds; Stop-Process $p }
+  cd dotnet; dotnet publish src/Guit.App -c Release -r win-x64 -p:Platform=x64
+  1..5 | % { $t = [Diagnostics.Stopwatch]::StartNew(); $p = Start-Process dotnet\artifacts\publish\Guit.App\release_win-x64\Guit.exe -PassThru; while ($p.MainWindowHandle -eq 0) { Start-Sleep -Milliseconds 5; $p.Refresh() }; $t.ElapsedMilliseconds; Stop-Process $p }
   ```
   Report the median of five runs, and ignore the first run.
 - **Never measure Debug or JIT builds.** They say nothing about the shipped app.

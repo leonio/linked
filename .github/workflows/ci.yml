@@ -20,15 +20,18 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
-          global-json-file: global.json
+          global-json-file: dotnet/global.json
       - name: Test Guit.Api
+        working-directory: dotnet
         run: dotnet test --project tests/Guit.Api.Tests -c Release
       - name: Test Guit.Core
+        working-directory: dotnet
         run: dotnet test --project tests/Guit.Core.Tests -c Release
       - name: Publish AOT smoke
+        working-directory: dotnet
         run: dotnet publish tests/Guit.AotSmoke -c Release -r linux-x64
       - name: Run AOT smoke
-        run: ./artifacts/publish/Guit.AotSmoke/release_linux-x64/Guit.AotSmoke
+        run: ./dotnet/artifacts/publish/Guit.AotSmoke/release_linux-x64/Guit.AotSmoke
       - name: Test the Rust core
         working-directory: rust
         run: cargo test -p guit-core --locked
@@ -54,20 +57,22 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
-          global-json-file: global.json
+          global-json-file: dotnet/global.json
       - name: Build
+        working-directory: dotnet
         run: dotnet build src/Guit.App -c Release -p:Platform=${{ matrix.platform }}
       - name: Publish Native AOT
+        working-directory: dotnet
         run: dotnet publish src/Guit.App -c Release -r ${{ matrix.rid }} -p:Platform=${{ matrix.platform }}
       - name: Launch and time start-up (the native exe must start and show a window)
         shell: pwsh
         run: |
-          $dir = Get-ChildItem artifacts/publish/Guit.App -Directory | Select-Object -First 1
+          $dir = Get-ChildItem dotnet/artifacts/publish/Guit.App -Directory | Select-Object -First 1
           ./tools/measure-startup.ps1 -Exe (Join-Path $dir.FullName 'Guit.exe') -Label "C# ${{ matrix.rid }}" -BudgetMs ${{ matrix.startup_budget_ms }}
       - uses: actions/upload-artifact@v4
         with:
           name: Guit-${{ matrix.rid }}
-          path: artifacts/publish/Guit.App/
+          path: dotnet/artifacts/publish/Guit.App/
           if-no-files-found: error
 
   rust:

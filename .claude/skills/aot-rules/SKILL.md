@@ -29,10 +29,10 @@ Anything found "at run time by name" does not exist. Every rule below follows fr
 
 - **`partial`** on every type a source generator or WinUI touches: view models, item models shown in lists,
   windows, pages, user controls, JSON contexts. If in doubt, make it `partial`.
-- **Register every JSON type** in `GitHubJsonContext` (`src/Guit.Api/GitHubJsonContext.cs`): each request type,
+- **Register every JSON type** in `GitHubJsonContext` (`dotnet/src/Guit.Api/GitHubJsonContext.cs`): each request type,
   each reply type, and `T[]` when a method returns an array. A missing entry compiles and then throws
   `NotSupportedException` at run time.
-- **Add a `Check(...)` to `tests/Guit.AotSmoke/Program.cs`** for each new Refit interface and each new view model,
+- **Add a `Check(...)` to `dotnet/tests/Guit.AotSmoke/Program.cs`** for each new Refit interface and each new view model,
   and a canned reply for each new path in `CannedHandler`. This is the only test that proves the code survives trimming.
 - Prefer `sealed` classes, `record` DTOs, `static` lambdas, and constructor injection.
 
@@ -54,6 +54,7 @@ If you cannot fix a warning with this table, stop and report it. Do not work aro
 ## Verify
 
 ```bash
+cd dotnet
 dotnet test --project tests/Guit.Api.Tests
 dotnet test --project tests/Guit.Core.Tests
 dotnet publish tests/Guit.AotSmoke -c Release -r linux-x64
