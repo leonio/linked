@@ -29,6 +29,46 @@ the manually started "Side-by-side builds" workflow.
 A single-file `.exe` is not possible: a WinUI 3 / Windows App SDK self-contained app needs its runtime files beside the exe,
 and Native AOT does not support single-file publish. The Rust app has the same runtime files.
 
+## Try it out
+
+You do not need to register anything or build anything. Both apps sign in with GitHub's
+[device flow](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps#device-flow)
+through one public OAuth App, so there is no client secret on your machine.
+
+1. **Download** the zip for your machine from the [latest release](../../releases/tag/latest): `win-x64` for most PCs,
+   `win-arm64` for Arm PCs (Copilot+ PCs, Surface Pro X). Pick the C# app, the Rust app, or both. Check it against
+   `SHA256SUMS.txt` if you like. Needs Windows 10 version 2004 (build 19041) or later.
+2. **Unzip** it anywhere and run `Guit.exe` (C#) or `guit.exe` (Rust). Nothing to install. The builds are not
+   code-signed yet, so Windows SmartScreen may warn: choose *More info* > *Run anyway*.
+3. **Sign in**: click *Sign in with GitHub*. The app shows a short code, copies it to the clipboard and opens
+   <https://github.com/login/device>. Paste the code, review what is requested, and click *Authorize*. The app
+   notices on its own and opens your inbox.
+4. **Look around**: Inbox, Pull requests, Conversations and Actions. Both apps share one sign-in, so signing in with
+   one signs in the other.
+
+**What you are authorizing.** The app asks for the scopes `notifications repo read:user`: your notifications, your
+profile, and access to your repositories, including private ones. GitHub has no narrower scope that covers marking
+notifications done, commenting and re-running workflows. The app talks only to GitHub's API and sends nothing
+elsewhere. The token is stored in the Windows Credential Locker, encrypted for your Windows user.
+If your organization restricts third-party OAuth Apps, its owner has to approve the app (or you stay with your
+personal repositories) before the org's repositories appear.
+
+**Taking it back.** Sign out in the app (C#: right-click your account in the sidebar > *Sign out*), and to revoke
+the authorization itself, go to GitHub > Settings > Applications > *Authorized OAuth Apps* > Guit > *Revoke*.
+
+### Use your own OAuth App instead
+
+If you would rather not authorize the project's OAuth App, register your own. It takes two minutes and needs no secret:
+
+1. GitHub > Settings > Developer settings > OAuth Apps > *New OAuth App*. Any name; Homepage URL: this repository;
+   Authorization callback URL: `http://127.0.0.1` (required but unused).
+2. Open the new app and tick **Enable Device Flow**. Copy the **Client ID**. Do not create a client secret.
+3. Give the app your client id:
+   - **C#**: set the environment variable `GUIT_GITHUB_CLIENT_ID` before starting `Guit.exe`
+     (PowerShell: `$env:GUIT_GITHUB_CLIENT_ID = "<client id>"; .\Guit.exe`).
+   - **Rust**: change `GITHUB_CLIENT_ID` in `rust/guit-core/src/lib.rs` and rebuild (see Build). The Rust app has no
+     environment override yet.
+
 ## Build
 
 C# (run from `dotnet/`; the WinUI app builds on Windows only):
