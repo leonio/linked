@@ -114,3 +114,39 @@ jobs:
           path: artifacts/guit-rs/
           if-no-files-found: error
 
+
+  # Every green build on main replaces the "latest" pre-release, so the newest builds always have a fixed URL:
+  #   https://github.com/<owner>/<repo>/releases/tag/latest
+  # Each app folder is uploaded by the jobs above; this job zips them and attaches the zips with checksums.
+  publish:
+    name: Publish the latest builds
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    needs: [core, app, rust]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: Guit-*
+          path: apps
+      - name: Zip each app
+        run: |
+          mkdir out
+          for dir in apps/*/; do
+            name=$(basename "$dir")                  # Guit-win-x64, Guit-rs-win-arm64, ...
+            cp tools/measure-startup.ps1 tools/measure-inbox.ps1 "$dir"
+            (cd "$dir" && zip -qr -X "$GITHUB_WORKSPACE/out/${name,,}.zip" . -x '*.pdb')
+          done
+          (cd out && sha256sum *.zip > SHA256SUMS.txt && cat SHA256SUMS.txt)
+      - name: Replace the latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete latest --cleanup-tag --yes || true
+          gh release create latest out/* \
+            --target "$GITHUB_SHA" \
+            --prerelease \
+            --title "Latest build (${GITHUB_SHA::7})" \
+            --notes "Self-contained zips of the C# (guit-win-*) and Rust (guit-rs-win-*) apps built from $GITHUB_SHA. Replaced on every build of main."
