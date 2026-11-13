@@ -15,6 +15,7 @@ pub mod link;
 pub mod rich;
 pub mod settings;
 pub mod time;
+pub mod trace;
 
 /// The OAuth App client id. Public, not a secret; the same app the C# client signs in with.
 pub const GITHUB_CLIENT_ID: &str = "Ov23lixGb2d0Qd0Wo2f3";

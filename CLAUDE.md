@@ -30,6 +30,7 @@ tests/Guit.Core.Tests              TUnit + hand-written fakes (Fakes.cs).
 tests/Guit.AotSmoke                Native AOT console app that runs the real DI graph. The AOT truth test.
 tools/ghapi.py                       Look up operations and schemas in GitHub's OpenAPI description.
 tools/measure-startup.ps1            Times start-up of either app the same way (used by CI and by people).
+tools/measure-inbox.ps1              Times launch to first inbox page, signed in (GUIT_TRACE_FILE). People only: CI cannot sign in.
 docs/PLAN.md, docs/tasks/            The roadmap and the task cards.
 
 rust/guit-core                       The Rust side's GitHub client and view logic. No Windows APIs; tests run anywhere.

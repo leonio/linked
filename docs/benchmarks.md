@@ -59,6 +59,20 @@ How to read this:
   More features mean more code to load, so expect the C# start-up figure to be the more "finished" one.
   Only the signed-out start is comparable today.
 
+## Measuring signed in
+
+CI cannot sign in, so the comparison that matters most has to run on a person's machine. Both builds write the
+moment their first inbox page arrives to the file named by `GUIT_TRACE_FILE`, and `tools/measure-inbox.ps1`
+uses that to time launch to inbox, launch to window and the working set with the inbox loaded:
+
+```powershell
+.\tools\measure-inbox.ps1 -Exe <path>\Guit.exe -Label "C#"
+.\tools\measure-inbox.ps1 -Exe <path>\guit.exe -Label "Rust"
+```
+
+The zips from the side-by-side workflow include the script. The time includes GitHub's response, which varies
+by more than either app's own cost, so run both apps alternately a few times and compare medians.
+
 ## Not measured yet
 
 - **Anything after sign-in**: time to a filled inbox, memory with a few hundred notifications loaded, scrolling

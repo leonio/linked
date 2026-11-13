@@ -675,7 +675,13 @@ impl Component for Guit {
             ) => match result {
                 Ok(items) => {
                     let applied = match purpose {
-                        Purpose::FirstPage => shell.inbox.first_page_loaded(generation, items),
+                        Purpose::FirstPage => {
+                            let applied = shell.inbox.first_page_loaded(generation, items);
+                            if applied {
+                                guit_core::trace::inbox_loaded();
+                            }
+                            applied
+                        }
                         Purpose::NextPage => shell.inbox.more_loaded(generation, items),
                     };
                     // With a kind filter on, keep fetching (a bounded number of pages) until the list is comfortably full.

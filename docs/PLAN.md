@@ -98,7 +98,8 @@ The same app on windows-rs and windows-reactor, to compare with the C# app. It r
 - [x] 6.8c Conversation parity, the rest: reactions, pull request header, Files changed, comment paging (by button)
 - [x] 6.11 Rust settings page (theme, account, about; theme shared with the C# app through its settings file) and keyboard shortcuts (Ctrl+1..3, F5, Alt+Left, Esc)
 - [x] 6.9 Actions pages: runs per repository, jobs with steps, self-updating while live, re-run, job log
-- [ ] 6.10 **[S]** Measure the signed-in scenarios on one machine: time to a filled inbox, memory, scrolling
+- [x] 6.10a Make the signed-in comparison measurable: GUIT_TRACE_FILE in both apps, `tools/measure-inbox.ps1`
+- [ ] 6.10b **[H]** Run it on one machine for both apps and record the numbers in `docs/benchmarks.md`; scrolling is still manual
 
 ## Known limits (decided, not to be "fixed" by a task)
 

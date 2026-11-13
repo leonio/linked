@@ -92,6 +92,7 @@ public sealed partial class InboxViewModel(
             Append(page);
             _page = 1;
             HasMore = page.Length == PageSize;
+            PerfTrace.InboxLoaded();
         }
         catch (OperationCanceledException)
         {

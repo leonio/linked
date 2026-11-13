@@ -91,13 +91,14 @@ jobs:
           ./tools/stage-rust.ps1 -BuildDir rust/target/${{ matrix.target }}/release -Out $rs
 
           foreach ($app in @(@{ Dir = $cs; Exe = 'Guit.exe'; Name = 'C# (.NET Native AOT, WinUI 3)' }, @{ Dir = $rs; Exe = 'guit.exe'; Name = 'Rust (windows-reactor)' })) {
-            Copy-Item tools/measure-startup.ps1 $app.Dir
+            Copy-Item tools/measure-startup.ps1, tools/measure-inbox.ps1 $app.Dir
             @"
           Guit $version, $($app.Name), $rid
           Built from commit $commit of https://github.com/${{ github.repository }}
 
           Run:      $($app.Exe)
           Measure:  powershell -ExecutionPolicy Bypass -File measure-startup.ps1 -Exe .\$($app.Exe) -Label "$($app.Name)"
+          Signed in: powershell -ExecutionPolicy Bypass -File measure-inbox.ps1 -Exe .\$($app.Exe) -Label "$($app.Name)"
 
           Both builds are self-contained (nothing to install) and share one sign-in: signing in with
           either signs in both. The Rust build has fewer features than the C# build; compare like with
