@@ -24,6 +24,8 @@
        only with a before/after measurement (see .claude/skills/performance/SKILL.md). -->
   <PropertyGroup>
     <PublishAot>true</PublishAot>
+    <!-- .NET 11: publish skips the full build chain (off by default for Native AOT). Watch for custom build hooks. -->
+    <UseOptimizedPublish>true</UseOptimizedPublish>
     <OptimizationPreference>Speed</OptimizationPreference>
     <TrimMode>full</TrimMode>
     <TrimmerSingleWarn>false</TrimmerSingleWarn>

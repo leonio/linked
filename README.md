@@ -37,7 +37,9 @@ through one public OAuth App, so there is no client secret on your machine.
 
 1. **Download** the zip for your machine from the [latest release](../../releases/tag/latest): `win-x64` for most PCs,
    `win-arm64` for Arm PCs (Copilot+ PCs, Surface Pro X). Pick the C# app, the Rust app, or both. Check it against
-   `SHA256SUMS.txt` if you like. Needs Windows 10 version 2004 (build 19041) or later.
+   `SHA256SUMS.txt` if you like. Needs Windows 10 version 2004 (build 19041) or later, and a CPU from roughly 2009 or newer
+   (x64 with the x86-64-v2 instructions, which includes SSE4.2 and POPCNT; Arm64 with LSE): .NET 11 refuses to start on older
+   hardware, and the C# app is built on it.
 2. **Unzip** it anywhere and run `Guit.exe` (C#) or `guit.exe` (Rust). Nothing to install. The builds are not
    code-signed yet, so Windows SmartScreen may warn: choose *More info* > *Run anyway*.
 3. **Sign in**: click *Sign in with GitHub*. The app shows a short code, copies it to the clipboard and opens
